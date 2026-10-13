@@ -1,0 +1,11 @@
+{
+    "device_address": "41:42:2E:78:9B:68",
+    "device_name": "Watch",
+    "notify_char_uuid": "6e400003-b5a3-f393-e0a9-e50e24dcca9f",
+    "trigger_hex": "DF0006",
+    "key": "RIGHT",
+    "key_back": "LEFT",
+    "enable_double_tap": true,
+    "double_tap_ms": 500,
+    "debounce_ms": 250
+}

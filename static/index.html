@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smartwatch Presenter Bridge</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.3);
+            --success: #22c55e;
+            --danger: #ef4444;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .header h1 {
+            font-size: 1.5rem;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .header p {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            margin-bottom: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            font-size: 0.95rem;
+        }
+        .status-row:last-child { border-bottom: none; }
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .badge-online { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+        .badge-offline { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .btn-connect {
+            width: 100%;
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 14px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 15px var(--accent-glow);
+            transition: transform 0.1s, opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .btn-connect:active { transform: scale(0.98); }
+        .btn-connect:disabled { opacity: 0.5; cursor: not-allowed; }
+        .flash-card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 30px 20px;
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+            border: 2px dashed rgba(255,255,255,0.1);
+            transition: all 0.2s ease;
+        }
+        .flash-card.active-forward {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: var(--success);
+            box-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
+        }
+        .flash-card.active-back {
+            background: rgba(56, 189, 248, 0.15);
+            border-color: var(--accent);
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
+        .flash-icon {
+            font-size: 3rem;
+            margin-bottom: 8px;
+        }
+        .flash-text {
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+        .manual-controls {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            max-width: 420px;
+            margin-top: 16px;
+        }
+        .btn-manual {
+            flex: 1;
+            padding: 16px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text);
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-manual:active { background: rgba(255,255,255,0.15); }
+        .log-box {
+            width: 100%;
+            max-width: 420px;
+            background: #090d16;
+            border-radius: 12px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #64748b;
+            height: 120px;
+            overflow-y: auto;
+            margin-top: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⌚ Smartwatch Remote Bridge</h1>
+        <p>Puente Web Bluetooth ➔ PC Linux</p>
+    </div>
+
+    <div class="card">
+        <div class="status-row">
+            <span>Enlace con PC:</span>
+            <span id="wsStatus" class="badge badge-offline">🔴 Desconectado</span>
+        </div>
+        <div class="status-row">
+            <span>Reloj Bluetooth:</span>
+            <span id="bleStatus" class="badge badge-offline">⚪ Sin conectar</span>
+        </div>
+        <div class="status-row">
+            <span>Batería reloj:</span>
+            <span id="batteryStatus" style="color: var(--muted); font-weight: bold;">--%</span>
+        </div>
+        <div style="margin-top: 16px;">
+            <button id="btnConnect" class="btn-connect">
+                <span>🔗 Conectar Smartwatch</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="flashCard" class="flash-card">
+        <div id="flashIcon" class="flash-icon">🎯</div>
+        <div id="flashText" class="flash-text">Listo para Diapositivas</div>
+        <p style="color: var(--muted); font-size: 0.8rem; margin-top: 6px;">
+            1 toque = Avanzar | 2 toques = Retroceder
+        </p>
+    </div>
+
+    <div class="manual-controls">
+        <button id="btnManualBack" class="btn-manual">⬅️ Retroceder</button>
+        <button id="btnManualNext" class="btn-manual">Avanzar ➡️</button>
+    </div>
+
+    <div id="logBox" class="log-box"></div>
+
+    <script>
+        const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9f';
+        const NUS_NOTIFY_CHAR = '6e400003-b5a3-f393-e0a9-e50e24dcca9f';
+        const BATT_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
+        const BATT_CHAR = '00002a19-0000-1000-8000-00805f9b34fb';
+
+        const wsStatus = document.getElementById('wsStatus');
+        const bleStatus = document.getElementById('bleStatus');
+        const batteryStatus = document.getElementById('batteryStatus');
+        const btnConnect = document.getElementById('btnConnect');
+        const flashCard = document.getElementById('flashCard');
+        const flashIcon = document.getElementById('flashIcon');
+        const flashText = document.getElementById('flashText');
+        const logBox = document.getElementById('logBox');
+
+        let ws = null;
+        let bleDevice = null;
+        let lastSeq = null;
+
+        function log(msg) {
+            const time = new Date().toLocaleTimeString();
+            logBox.innerHTML = `<div>[${time}] ${msg}</div>` + logBox.innerHTML;
+        }
+
+        // Mantener pantalla del celular despierta
+        if ('wakeLock' in navigator) {
+            navigator.wakeLock.request('screen').catch(() => {});
+        }
+
+        // 1. WebSocket a la PC
+        function connectWebSocket() {
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${proto}//${location.host}/ws`;
+            log(`Conectando WebSocket a ${wsUrl}...`);
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                wsStatus.className = 'badge badge-online';
+                wsStatus.textContent = '🟢 Conectado';
+                log('✓ Conectado a la PC con éxito');
+            };
+
+            ws.onclose = () => {
+                wsStatus.className = 'badge badge-offline';
+                wsStatus.textContent = '🔴 Desconectado';
+                setTimeout(connectWebSocket, 2000);
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    if (data.action === 'forward') {
+                        triggerVisual('forward', '⏩ AVANZAR DIAPOSITIVA');
+                    } else if (data.action === 'back') {
+                        triggerVisual('back', '⏪ RETROCEDER DIAPOSITIVA');
+                    }
+                } catch(err) {}
+            };
+        }
+
+        function triggerVisual(type, text) {
+            flashIcon.textContent = type === 'forward' ? '⏩' : '⏪';
+            flashText.textContent = text;
+            flashCard.className = `flash-card active-${type}`;
+            if (navigator.vibrate) navigator.vibrate(50);
+            setTimeout(() => {
+                flashCard.className = 'flash-card';
+                flashIcon.textContent = '🎯';
+                flashText.textContent = 'Esperando pulsación...';
+            }, 700);
+        }
+
+        function sendEvent(type, seq = -1) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ event: type, sequence: seq, timestamp: Date.now() }));
+            }
+        }
+
+        // 2. Web Bluetooth API
+        async function connectBLE() {
+            if (!navigator.bluetooth) {
+                alert('Tu navegador no soporta Web Bluetooth. Usa Google Chrome en Android.');
+                return;
+            }
+
+            try {
+                log('Buscando dispositivos Bluetooth...');
+                btnConnect.disabled = true;
+
+                bleDevice = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [NUS_SERVICE, BATT_SERVICE, '00003802-0000-1000-8000-00805f9b34fb']
+                });
+
+                log(`Dispositivo seleccionado: ${bleDevice.name}`);
+                bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+                log('Conectando al servidor GATT...');
+                const server = await bleDevice.gatt.connect();
+
+                bleStatus.className = 'badge badge-online';
+                bleStatus.textContent = `🟢 ${bleDevice.name || 'Conectado'}`;
+                btnConnect.textContent = '✓ Reloj Conectado';
+                log('✓ GATT Conectado. Buscando servicio de Cámara...');
+
+                // Servicio Nordic UART (Laxasfit)
+                const nus = await server.getPrimaryService(NUS_SERVICE);
+                const charNotify = await nus.getCharacteristic(NUS_NOTIFY_CHAR);
+                await charNotify.startNotifications();
+                charNotify.addEventListener('characteristicvaluechanged', onPacketReceived);
+                log('✓ Suscrito a notificaciones de Cámara!');
+
+                // Lectura de Batería y Heartbeat
+                try {
+                    const battServ = await server.getPrimaryService(BATT_SERVICE);
+                    const battChar = await battServ.getCharacteristic(BATT_CHAR);
+                    const bVal = await battChar.readValue();
+                    batteryStatus.textContent = `${bVal.getUint8(0)}%`;
+                    // Heartbeat periódico
+                    setInterval(async () => {
+                        if (bleDevice && bleDevice.gatt.connected) {
+                            try {
+                                const v = await battChar.readValue();
+                                batteryStatus.textContent = `${v.getUint8(0)}%`;
+                            } catch(e) {}
+                        }
+                    }, 5000);
+                } catch(e) {}
+
+            } catch (err) {
+                log(`[!] Error BLE: ${err.message}`);
+                btnConnect.disabled = false;
+            }
+        }
+
+        function onDisconnected() {
+            bleStatus.className = 'badge badge-offline';
+            bleStatus.textContent = '⚪ Desconectado';
+            btnConnect.disabled = false;
+            btnConnect.textContent = '🔗 Reconectar Smartwatch';
+            log('[!] Reloj desconectado.');
+        }
+
+        function onPacketReceived(event) {
+            const data = event.target.value;
+            let hexArr = [];
+            for (let i = 0; i < data.byteLength; i++) {
+                hexArr.push(data.getUint8(i).toString(16).padStart(2, '0').toUpperCase());
+            }
+            const hex = hexArr.join('');
+
+            // Protocolo Laxasfit: DF 00 06 ... 0C 01
+            if (hex.startsWith('DF0006') && hex.includes('0C01')) {
+                const seq = data.getUint8(6);
+                if (seq === lastSeq) return; // descartar ráfaga
+                lastSeq = seq;
+                log(`🎯 Disparo reloj (Seq: ${seq})`);
+                sendEvent('shutter', seq);
+            }
+        }
+
+        btnConnect.addEventListener('click', connectBLE);
+        document.getElementById('btnManualNext').addEventListener('click', () => sendEvent('forward'));
+        document.getElementById('btnManualBack').addEventListener('click', () => sendEvent('back'));
+
+        connectWebSocket();
+    </script>
+</body>
+</html>

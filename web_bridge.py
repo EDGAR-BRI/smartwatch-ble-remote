@@ -140,11 +140,25 @@ class BridgeServer:
             self.pending_forward_task = asyncio.create_task(delayed_forward())
 
 
+    async def handle_download(self, request):
+        apk_path = os.path.join(
+            os.path.dirname(__file__),
+            "mobile_app", "build", "app", "outputs", "flutter-apk", "app-release.apk"
+        )
+        if os.path.exists(apk_path):
+            return web.FileResponse(apk_path, headers={
+                "Content-Disposition": 'attachment; filename="SmartwatchPresenter.apk"'
+            })
+        return web.Response(text="APK no encontrado", status=404)
+
+
 async def main():
     bridge = BridgeServer()
     app = web.Application()
     app.router.add_get("/", bridge.handle_index)
     app.router.add_get("/ws", bridge.handle_ws)
+    app.router.add_get("/app.apk", bridge.handle_download)
+    app.router.add_get("/download", bridge.handle_download)
 
     runner = web.AppRunner(app)
     await runner.setup()

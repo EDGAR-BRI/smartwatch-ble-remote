@@ -21,6 +21,7 @@ class DevHttpOverrides extends HttpOverrides {
 const String defaultPcUrl = "10.0.0.3:8888";
 const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
+const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
 
@@ -61,6 +62,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
   final TextEditingController _pcController = TextEditingController(text: defaultPcUrl);
 
   BluetoothDevice? _device;
+  BluetoothCharacteristic? _writeChar;
   StreamSubscription? _scanSub;
   StreamSubscription? _valueSub;
   StreamSubscription? _stateSub;
@@ -376,6 +378,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
     try {
       List<BluetoothService> services = await device.discoverServices();
       BluetoothCharacteristic? notifyChar;
+      BluetoothCharacteristic? writeChar;
       BluetoothCharacteristic? battChar;
 
       for (var s in services) {
@@ -384,11 +387,15 @@ class _PresenterScreenState extends State<PresenterScreen> {
           final shortUuid = c.uuid.str.toLowerCase();
           if (uuid == nusNotifyCharUuid.toLowerCase() || shortUuid == "6e400003") {
             notifyChar = c;
+          } else if (uuid == nusWriteCharUuid.toLowerCase() || shortUuid == "6e400002") {
+            writeChar = c;
           } else if (uuid == battCharUuid.toLowerCase() || shortUuid == "2a19") {
             battChar = c;
           }
         }
       }
+
+      _writeChar = writeChar;
 
       // Si no encuentra el UUID exacto, buscar por prefijo 6e400003
       if (notifyChar == null) {
@@ -413,7 +420,6 @@ class _PresenterScreenState extends State<PresenterScreen> {
         });
       } else {
         _log("[!] No se halló característica de cámara NUS. Probando todas notify...");
-        // Fallback: escuchar cualquier característica con Notify
         for (var s in services) {
           for (var c in s.characteristics) {
             if (c.properties.notify) {
@@ -427,7 +433,26 @@ class _PresenterScreenState extends State<PresenterScreen> {
         }
       }
 
-      // Batería
+      // Canal de escritura y Keepalive Activo
+      if (_writeChar != null) {
+        _log("✓ Canal de control NUS listo");
+        try {
+          // Activar/mantener modo cámara en el reloj
+          await _writeChar!.write([0xDF, 0x00, 0x04, 0x00, 0x0C, 0x01, 0x01], withoutResponse: true);
+        } catch (_) {}
+
+        // Ping periódico cada 4s (resetea el watchdog del reloj sin bloquear el hilo GATT)
+        _heartbeatTimer?.cancel();
+        _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+          if (_isBleConnected && _writeChar != null) {
+            try {
+              await _writeChar!.write([0xDF, 0x00, 0x04, 0x00, 0x0C, 0x01, 0x01], withoutResponse: true);
+            } catch (_) {}
+          }
+        });
+      }
+
+      // Batería (sólo lectura pasiva / notificación, sin bloqueo periódico)
       if (battChar != null) {
         try {
           if (battChar.properties.notify) {
@@ -444,19 +469,6 @@ class _PresenterScreenState extends State<PresenterScreen> {
             _log("✓ Batería del reloj: ${val[0]}%");
           }
         } catch (_) {}
-
-        // Heartbeat de Batería periódico (cada 4s) para mantener viva la conexión
-        _heartbeatTimer?.cancel();
-        _heartbeatTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
-          if (_isBleConnected && battChar != null) {
-            try {
-              var val = await battChar.read();
-              if (val.isNotEmpty && mounted) {
-                setState(() => _watchBattery = "${val[0]}%");
-              }
-            } catch (_) {}
-          }
-        });
       }
     } catch (e) {
       _log("[!] Error en descubrimiento GATT: $e");
@@ -481,6 +493,18 @@ class _PresenterScreenState extends State<PresenterScreen> {
     }
 
     if (isShutter) {
+      // Enviar ACK inmediato al reloj para que sepa que la foto fue tomada
+      if (_writeChar != null) {
+        try {
+          final ack = List<int>.from(bytes);
+          if (ack.isNotEmpty) {
+            ack[ack.length - 1] = 0x00;
+            _writeChar!.write(ack, withoutResponse: true);
+            _log("✓ ACK enviado al reloj");
+          }
+        } catch (_) {}
+      }
+
       // Desduplicar ráfagas con la misma secuencia
       if (seq != -1 && seq == _lastSequence) return;
       _lastSequence = seq;

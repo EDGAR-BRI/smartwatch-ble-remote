@@ -274,6 +274,64 @@
             }
         }
 
+        let heartbeatTimer = null;
+        let isAutoReconnecting = false;
+
+        async function setupServices(server) {
+            // Servicio Nordic UART (Laxasfit)
+            const nus = await server.getPrimaryService(NUS_SERVICE);
+            const charNotify = await nus.getCharacteristic(NUS_NOTIFY_CHAR);
+            await charNotify.startNotifications();
+            charNotify.addEventListener('characteristicvaluechanged', onPacketReceived);
+            log('✓ Suscrito a notificaciones de Cámara!');
+
+            // Heartbeat cada 3s para evitar desconexión del firmware
+            try {
+                const battServ = await server.getPrimaryService(BATT_SERVICE);
+                const battChar = await battServ.getCharacteristic(BATT_CHAR);
+                const bVal = await battChar.readValue();
+                batteryStatus.textContent = `${bVal.getUint8(0)}%`;
+
+                if (heartbeatTimer) clearInterval(heartbeatTimer);
+                heartbeatTimer = setInterval(async () => {
+                    if (bleDevice && bleDevice.gatt.connected) {
+                        try {
+                            const v = await battChar.readValue();
+                            batteryStatus.textContent = `${v.getUint8(0)}%`;
+                        } catch(e) {}
+                    }
+                }, 3000);
+            } catch(e) {}
+        }
+
+        async function autoReconnect() {
+            if (!bleDevice || bleDevice.gatt.connected || isAutoReconnecting) return;
+            isAutoReconnecting = true;
+            bleStatus.className = 'badge badge-offline';
+            bleStatus.textContent = '⏳ Reconectando...';
+
+            const tryConnect = async () => {
+                if (!bleDevice || bleDevice.gatt.connected) {
+                    isAutoReconnecting = false;
+                    return;
+                }
+                try {
+                    log('Auto-reconectando al reloj...');
+                    const server = await bleDevice.gatt.connect();
+                    await setupServices(server);
+                    bleStatus.className = 'badge badge-online';
+                    bleStatus.textContent = `🟢 ${bleDevice.name || 'Conectado'}`;
+                    btnConnect.textContent = '✓ Reloj Conectado';
+                    log('✓ Reconexión automática completada!');
+                    isAutoReconnecting = false;
+                } catch(err) {
+                    setTimeout(tryConnect, 1500);
+                }
+            };
+
+            tryConnect();
+        }
+
         // 2. Web Bluetooth API
         async function connectBLE() {
             if (!navigator.bluetooth) {
@@ -299,31 +357,10 @@
                 bleStatus.className = 'badge badge-online';
                 bleStatus.textContent = `🟢 ${bleDevice.name || 'Conectado'}`;
                 btnConnect.textContent = '✓ Reloj Conectado';
-                log('✓ GATT Conectado. Buscando servicio de Cámara...');
+                btnConnect.disabled = false;
+                log('✓ GATT Conectado.');
 
-                // Servicio Nordic UART (Laxasfit)
-                const nus = await server.getPrimaryService(NUS_SERVICE);
-                const charNotify = await nus.getCharacteristic(NUS_NOTIFY_CHAR);
-                await charNotify.startNotifications();
-                charNotify.addEventListener('characteristicvaluechanged', onPacketReceived);
-                log('✓ Suscrito a notificaciones de Cámara!');
-
-                // Lectura de Batería y Heartbeat
-                try {
-                    const battServ = await server.getPrimaryService(BATT_SERVICE);
-                    const battChar = await battServ.getCharacteristic(BATT_CHAR);
-                    const bVal = await battChar.readValue();
-                    batteryStatus.textContent = `${bVal.getUint8(0)}%`;
-                    // Heartbeat periódico
-                    setInterval(async () => {
-                        if (bleDevice && bleDevice.gatt.connected) {
-                            try {
-                                const v = await battChar.readValue();
-                                batteryStatus.textContent = `${v.getUint8(0)}%`;
-                            } catch(e) {}
-                        }
-                    }, 5000);
-                } catch(e) {}
+                await setupServices(server);
 
             } catch (err) {
                 log(`[!] Error BLE: ${err.message}`);
@@ -332,11 +369,12 @@
         }
 
         function onDisconnected() {
+            if (heartbeatTimer) clearInterval(heartbeatTimer);
             bleStatus.className = 'badge badge-offline';
             bleStatus.textContent = '⚪ Desconectado';
-            btnConnect.disabled = false;
             btnConnect.textContent = '🔗 Reconectar Smartwatch';
-            log('[!] Reloj desconectado.');
+            log('[!] Reloj desconectado. Intentando auto-reconexión...');
+            autoReconnect();
         }
 
         function onPacketReceived(event) {

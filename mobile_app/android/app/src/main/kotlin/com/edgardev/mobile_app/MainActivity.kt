@@ -1,5 +1,8 @@
 package com.edgardev.mobile_app
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
@@ -183,9 +186,53 @@ class MainActivity : FlutterActivity() {
             }
 
             startSilentAudio()
+            showForegroundNotification()
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private val NOTIFICATION_ID = 2026
+    private val CHANNEL_ID = "smartwatch_presenter_bg"
+
+    private fun showForegroundNotification() {
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    CHANNEL_ID,
+                    "Smartwatch Presenter en Segundo Plano",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Mantiene los controles multimedia y la conexión activos en segundo plano"
+                    setShowBadge(false)
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(this, CHANNEL_ID)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(this)
+            }
+                .setContentTitle("Smartwatch Presenter Activo")
+                .setContentText("Controlando diapositivas en segundo plano (Rueda + Música)")
+                .setSmallIcon(android.R.drawable.ic_media_play)
+                .setOngoing(true)
+                .build()
+
+            notificationManager.notify(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun cancelNotification() {
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(NOTIFICATION_ID)
+        } catch (_: Exception) {}
     }
 
     private fun requestAudioFocus() {
@@ -212,6 +259,7 @@ class MainActivity : FlutterActivity() {
 
     private fun stopMediaSession() {
         stopSilentAudio()
+        cancelNotification()
         try {
             mediaSession?.apply {
                 isActive = false

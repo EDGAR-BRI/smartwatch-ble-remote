@@ -23,7 +23,7 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.3+4";
+const String appVersion = "1.0.4+5";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
 const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media_session');
 
@@ -77,6 +77,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
   bool _isWsConnected = false;
   bool _isScanning = false;
   bool _isMediaActive = false;
+  bool _batteryOptIgnored = false;
   bool _bluetoothEnabled = true;
   bool _permissionsGranted = false;
   int? _lastSequence;
@@ -159,7 +160,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
     });
   }
 
-  // 1. Permisos Android (Bluetooth Scan, Connect, Location)
+  // 1. Permisos Android (Bluetooth, Notificaciones, Segundo Plano sin restricciones)
   Future<void> _requestPermissions() async {
     _log("[+] Comprobando permisos...");
     if (Platform.isAndroid) {
@@ -167,20 +168,39 @@ class _PresenterScreenState extends State<PresenterScreen> {
         Permission.bluetoothScan,
         Permission.bluetoothConnect,
         Permission.locationWhenInUse,
+        Permission.notification,
       ].request();
 
       final scanOk = statuses[Permission.bluetoothScan]?.isGranted ?? true;
       final connOk = statuses[Permission.bluetoothConnect]?.isGranted ?? true;
       final locOk = statuses[Permission.locationWhenInUse]?.isGranted ?? true;
 
+      // Solicitar permiso explícito de segundo plano (sin ahorro de batería)
+      try {
+        final isIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
+        if (!isIgnored) {
+          _log("[+] Solicitando segundo plano sin cortes...");
+          final reqResult = await Permission.ignoreBatteryOptimizations.request();
+          _batteryOptIgnored = reqResult.isGranted;
+        } else {
+          _batteryOptIgnored = true;
+        }
+      } catch (_) {}
+
       setState(() {
         _permissionsGranted = (scanOk && connOk) || locOk;
       });
 
       if (_permissionsGranted) {
-        _log("✓ Permisos concedidos");
+        _log("✓ Permisos Bluetooth concedidos");
       } else {
         _log("[!] Faltan permisos de Dispositivos Cercanos o Ubicación");
+      }
+
+      if (_batteryOptIgnored) {
+        _log("✓ Segundo plano sin restricciones de batería");
+      } else {
+        _log("[!] Para evitar que se cierre con pantalla apagada, desactiva el ahorro de batería");
       }
     } else {
       setState(() => _permissionsGranted = true);
@@ -634,6 +654,39 @@ class _PresenterScreenState extends State<PresenterScreen> {
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
                       onPressed: () => FlutterBluePlus.turnOn(),
                       child: const Text("Encender", style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Banner de optimización de batería (Segundo Plano)
+            if (!_batteryOptIgnored && Platform.isAndroid)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.battery_alert, color: Colors.amber, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text("Habilitar segundo plano sin cortes", style: TextStyle(fontSize: 12)),
+                    ),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.amber,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
+                      onPressed: () async {
+                        await Permission.ignoreBatteryOptimizations.request();
+                        final ok = await Permission.ignoreBatteryOptimizations.isGranted;
+                        if (mounted) setState(() => _batteryOptIgnored = ok);
+                      },
+                      child: const Text("Activar", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     ),
                   ],
                 ),

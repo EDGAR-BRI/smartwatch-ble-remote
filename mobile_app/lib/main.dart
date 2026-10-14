@@ -23,7 +23,7 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.2+3";
+const String appVersion = "1.0.3+4";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
 const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media_session');
 
@@ -111,16 +111,16 @@ class _PresenterScreenState extends State<PresenterScreen> {
       if (call.method == "onMediaAction") {
         final action = call.arguments?.toString() ?? "";
         if (action == "forward") {
-          _log("🎵 Reloj ➔ Siguiente (AVRCP) ➔ Avanzar");
-          _triggerFlash(const Color(0xFF22C55E), "⏩ AVANZAR (Reloj)");
+          _log("🎵 Reloj (Botón/Rueda ➔) ➔ Avanzar");
+          _triggerFlash(const Color(0xFF22C55E), "⏩ AVANZAR");
           _sendWs("forward");
         } else if (action == "back") {
-          _log("🎵 Reloj ➔ Anterior (AVRCP) ➔ Retroceder");
-          _triggerFlash(const Color(0xFF38BDF8), "⏪ RETROCEDER (Reloj)");
+          _log("🎵 Reloj (Botón/Rueda ⬅) ➔ Retroceder");
+          _triggerFlash(const Color(0xFF38BDF8), "⏪ RETROCEDER");
           _sendWs("back");
         } else if (action == "play_pause") {
-          _log("🎵 Reloj ➔ Play/Pausa (AVRCP)");
-          _triggerFlash(Colors.purpleAccent, "⏯️ PLAY/PAUSA (Reloj)");
+          _log("🎵 Reloj ➔ Play/Pausa");
+          _triggerFlash(Colors.purpleAccent, "⏯️ PLAY/PAUSA");
         }
       }
     });
@@ -596,7 +596,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Smartwatch Presenter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-            Text('v$appVersion • AVRCP Música + BLE', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.normal)),
+            Text('v$appVersion • Rueda + Música + BLE', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.normal)),
           ],
         ),
         backgroundColor: const Color(0xFF1E293B),
@@ -718,9 +718,9 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Controles de Música (Reloj)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const Text("Música y Rueda del Reloj", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         Text(
-                          _isMediaActive ? "Capturando ⏭️ Siguiente y ⏮️ Anterior" : "Simulador desactivado",
+                          _isMediaActive ? "Activo: ⏭️ Siguiente, ⏮️ Atrás y 🎛️ Rueda" : "Simulador desactivado",
                           style: TextStyle(color: _isMediaActive ? const Color(0xFF22C55E) : Colors.white38, fontSize: 11),
                         ),
                       ],

@@ -83,9 +83,9 @@ def get_app_version_info():
         base_dir, "mobile_app", "build", "app", "outputs", "flutter-apk", "app-release.apk"
     )
 
-    version = "1.0.1+2"
-    version_name = "1.0.1"
-    build_number = "2"
+    version = "1.1.0+14"
+    version_name = "1.1.0"
+    build_number = "14"
     if os.path.exists(pubspec_path):
         try:
             with open(pubspec_path, "r", encoding="utf-8") as f:
@@ -266,7 +266,7 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
         try:
             msg = data.decode("utf-8", errors="ignore").strip()
-            if "DISCOVER" in msg or "SMARTWATCH" in msg or "PRESENTER" in msg or "BTPRESENTER" in msg or "CLICKER" in msg:
+            if "DISCOVER" in msg or "SMARTWATCH" in msg or "PRESENTER" in msg or "AIR" in msg or "CLICKER" in msg:
                 info = get_app_version_info()
                 response = json.dumps({
                     "service": "bt-presenter",
@@ -306,6 +306,7 @@ async def main():
     app.router.add_static("/static", os.path.join(os.path.dirname(__file__), "static"))
     app.router.add_get("/ws", bridge.handle_ws)
     app.router.add_get("/BTPresenter.apk", bridge.handle_download)
+    app.router.add_get("/AirPresenter.apk", bridge.handle_download)
     app.router.add_get("/BTClicker.apk", bridge.handle_download)
     app.router.add_get("/SmartwatchPresenter.apk", bridge.handle_download)
     app.router.add_get("/app.apk", bridge.handle_download)
@@ -342,7 +343,7 @@ async def main():
     beacon_task = asyncio.create_task(broadcast_beacon(udp_transport, local_ip, 8888, 8080))
     info = get_app_version_info()
     print("\n" + "=" * 70)
-    print("  BT PRESENTER // LINUX uinput ACTIVO (RELOJ / AURICULARES / BLE ➔ PC)")
+    print("  BT PRESENTER // LINUX uinput ACTIVO (RELOJ / AUDÍFONOS / BLUETOOTH ➔ PC)")
     print("=" * 70)
     print(f"  📦 Versión App Android: v{info['version']} ({info['size_mb']})")
     print(f"  🕒 Compilación: {info['build_time']}")

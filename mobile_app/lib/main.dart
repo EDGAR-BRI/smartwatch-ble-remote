@@ -43,11 +43,9 @@ class BTPresenterApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF0F172A), // Slate 900
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF38BDF8), // Sky 400
-          surface: Color(0xFF1E293B), // Slate 800
-          secondary: Color(0xFF818CF8), // Indigo 400
+          primary: Color(0xFF38BDF8),
+          surface: Color(0xFF1E293B),
         ),
-        cardColor: const Color(0xFF1E293B),
       ),
       home: const PresenterScreen(),
     );
@@ -69,23 +67,18 @@ class _PresenterScreenState extends State<PresenterScreen> {
   Timer? _wsReconnectTimer;
 
   bool _isBtConnected = false;
-  String _btDeviceName = "Desconectado";
+  String _btDeviceName = "Sin dispositivo";
   bool _isWsConnected = false;
   bool _isMediaActive = false;
-  bool _batteryOptIgnored = false;
-  bool _permissionsGranted = false;
   bool _isCheckingUpdate = false;
   bool _hapticEnabled = true;
   bool _isDiscovering = false;
   bool _showSplash = true;
-  bool _showManualIp = false;
-  bool _showActivityLog = false;
-  int _actionCount = 0;
   RawDatagramSocket? _discoverySocket;
   Timer? _discoveryTimeoutTimer;
 
-  String _lastActionText = "¡Listo para presentar!";
-  String _lastActionSub = "Toca tus auriculares, reloj o los botones abajo";
+  String _lastActionTitle = "Listo para presentar";
+  String _lastActionSub = "Toca tus audífonos, reloj o los botones";
   Color _flashColor = Colors.transparent;
   final List<String> _logs = [];
 
@@ -96,8 +89,8 @@ class _PresenterScreenState extends State<PresenterScreen> {
   }
 
   Future<void> _initApp() async {
-    // Splash screen limpio y rápido de 1.1 segundos
-    Future.delayed(const Duration(milliseconds: 1100), () {
+    // Splash screen limpio de 1.0 segundo
+    Future.delayed(const Duration(milliseconds: 1000), () {
       if (mounted) setState(() => _showSplash = false);
     });
 
@@ -105,7 +98,6 @@ class _PresenterScreenState extends State<PresenterScreen> {
       await WakelockPlus.enable();
     } catch (_) {}
 
-    // Limpieza de caché de APKs previos
     try {
       final cacheDir = await _mediaChannel.invokeMethod<String>('getCacheDir');
       if (cacheDir != null) {
@@ -129,30 +121,30 @@ class _PresenterScreenState extends State<PresenterScreen> {
         if (!_isBtConnected) {
           setState(() {
             _isBtConnected = true;
-            if (_btDeviceName == "Desconectado") {
-              _btDeviceName = "Dispositivo Bluetooth";
+            if (_btDeviceName == "Sin dispositivo") {
+              _btDeviceName = "Dispositivo Activo";
             }
           });
         }
         if (action == "forward") {
           _triggerAction(
             "forward",
-            "⏩ Diapositiva Siguiente",
-            "Disparo desde tus auriculares / reloj",
+            "⏩ Siguiente Diapositiva",
+            "Disparo desde auriculares / reloj",
             const Color(0xFF38BDF8),
           );
         } else if (action == "back") {
           _triggerAction(
             "back",
             "⏪ Diapositiva Anterior",
-            "Disparo desde tus auriculares / reloj",
+            "Disparo desde auriculares / reloj",
             const Color(0xFFF43F5E),
           );
         } else if (action == "play_pause") {
           _triggerAction(
             "play_pause",
             "⏸️ Telón Negro (Pausa)",
-            "Ocultar o pausar pantalla de diapositivas",
+            "Disparo desde auriculares / reloj",
             const Color(0xFFA855F7),
           );
         }
@@ -166,25 +158,21 @@ class _PresenterScreenState extends State<PresenterScreen> {
             if (name.isNotEmpty) {
               _btDeviceName = name;
             } else if (!connected) {
-              _btDeviceName = "Desconectado";
+              _btDeviceName = "Sin dispositivo";
             }
           });
         }
-        if (connected) {
-          _log("✓ Bluetooth conectado: $_btDeviceName");
-        } else {
-          _log("[-] Bluetooth desconectado");
-        }
+        _log(connected
+            ? "✓ Bluetooth conectado: $_btDeviceName"
+            : "[-] Bluetooth desconectado");
       }
     });
 
     try {
       await _mediaChannel.invokeMethod('startMediaSession');
       if (mounted) setState(() => _isMediaActive = true);
-      _log("✓ Servicio de control multimedia activo");
-    } catch (e) {
-      _log("[!] Error iniciando servicio multimedia: $e");
-    }
+      _log("✓ Escucha de auriculares activa");
+    } catch (_) {}
 
     _refreshBluetoothDevice();
   }
@@ -209,15 +197,11 @@ class _PresenterScreenState extends State<PresenterScreen> {
       if (enable) {
         await _mediaChannel.invokeMethod('startMediaSession');
         if (mounted) setState(() => _isMediaActive = true);
-        _log("✓ Control por auriculares activado");
       } else {
         await _mediaChannel.invokeMethod('stopMediaSession');
         if (mounted) setState(() => _isMediaActive = false);
-        _log("[-] Control por auriculares desactivado");
       }
-    } catch (e) {
-      _log("[!] Error alternando servicio: $e");
-    }
+    } catch (_) {}
   }
 
   void _log(String msg) {
@@ -225,35 +209,23 @@ class _PresenterScreenState extends State<PresenterScreen> {
     setState(() {
       final now = DateTime.now().toIso8601String().substring(11, 19);
       _logs.insert(0, "[$now] $msg");
-      if (_logs.length > 50) _logs.removeLast();
+      if (_logs.length > 40) _logs.removeLast();
     });
   }
 
   Future<void> _requestPermissions() async {
     if (Platform.isAndroid) {
-      final statuses = await [
+      await [
         Permission.bluetoothConnect,
         Permission.notification,
       ].request();
 
-      final connOk = statuses[Permission.bluetoothConnect]?.isGranted ?? true;
-
       try {
         final isIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
         if (!isIgnored) {
-          final reqResult =
-              await Permission.ignoreBatteryOptimizations.request();
-          _batteryOptIgnored = reqResult.isGranted;
-        } else {
-          _batteryOptIgnored = true;
+          await Permission.ignoreBatteryOptimizations.request();
         }
       } catch (_) {}
-
-      setState(() {
-        _permissionsGranted = connOk;
-      });
-    } else {
-      setState(() => _permissionsGranted = true);
     }
   }
 
@@ -273,8 +245,6 @@ class _PresenterScreenState extends State<PresenterScreen> {
     _isCheckingUpdate = true;
 
     try {
-      if (manual) _log("Buscando actualización...");
-
       final infoUri = _getPcHttpUri('/api/app-info');
       final client = HttpClient()
         ..badCertificateCallback = ((c, h, p) => true);
@@ -302,27 +272,11 @@ class _PresenterScreenState extends State<PresenterScreen> {
 
       if (!hasUpdate) {
         if (manual && mounted) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              backgroundColor: const Color(0xFF1E293B),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              title: const Row(
-                children: [
-                  Icon(Icons.check_circle, color: Color(0xFF10B981)),
-                  SizedBox(width: 10),
-                  Text("App al día"),
-                ],
-              ),
-              content: Text(
-                  "Ya tienes la versión más reciente instalada (v$appVersion)."),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text("Entendido"),
-                ),
-              ],
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("✓ Ya tienes la versión más reciente (v$appVersion)"),
+              duration: Duration(seconds: 2),
+              backgroundColor: Color(0xFF10B981),
             ),
           );
         }
@@ -337,59 +291,31 @@ class _PresenterScreenState extends State<PresenterScreen> {
             backgroundColor: const Color(0xFF1E293B),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Row(
-              children: [
-                Icon(Icons.system_update, color: Color(0xFF38BDF8)),
-                SizedBox(width: 10),
-                Text("Nueva Versión"),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Hay una nueva versión disponible: v$serverVersion",
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Text("Tamaño aproximado: $sizeMb",
-                    style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 12),
-                const Text(
-                    "¿Deseas descargarla e instalarla automáticamente ahora?"),
-              ],
-            ),
+            title: const Text("Actualización Disponible",
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            content: Text(
+                "Hay una nueva versión disponible (v$serverVersion - $sizeMb). ¿Deseas actualizar ahora?"),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text("Más tarde"),
+                child: const Text("Luego"),
               ),
-              ElevatedButton.icon(
+              ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF38BDF8),
                   foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
                 ),
-                icon: const Icon(Icons.download, size: 18),
-                label: const Text("Actualizar"),
                 onPressed: () {
                   Navigator.pop(ctx);
                   _downloadAndInstallApk(serverVersion, sizeMb);
                 },
+                child: const Text("Actualizar"),
               ),
             ],
           ),
         );
       }
-    } catch (e) {
-      if (manual && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("No se pudo verificar actualización: $e"),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+    } catch (_) {
     } finally {
       _isCheckingUpdate = false;
     }
@@ -408,10 +334,9 @@ class _PresenterScreenState extends State<PresenterScreen> {
                 backgroundColor: const Color(0xFF1E293B),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)),
-                title: const Text("Permiso de Instalación"),
+                title: const Text("Permiso requerido"),
                 content: const Text(
-                  "Para actualizar la app directamente, por favor autoriza a 'BT Presenter' a instalar aplicaciones.",
-                ),
+                    "Por favor autoriza la instalación de actualizaciones directas."),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx, false),
@@ -437,7 +362,6 @@ class _PresenterScreenState extends State<PresenterScreen> {
       }
 
       double progress = 0.0;
-      String statusText = "Iniciando descarga...";
       StateSetter? dialogSetState;
 
       if (!mounted) return;
@@ -452,13 +376,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                 backgroundColor: const Color(0xFF1E293B),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16)),
-                title: Row(
-                  children: [
-                    const Icon(Icons.downloading, color: Color(0xFF38BDF8)),
-                    const SizedBox(width: 10),
-                    Text("Descargando v$version"),
-                  ],
-                ),
+                title: const Text("Descargando actualización..."),
                 content: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -468,10 +386,9 @@ class _PresenterScreenState extends State<PresenterScreen> {
                       valueColor: const AlwaysStoppedAnimation<Color>(
                           Color(0xFF38BDF8)),
                     ),
-                    const SizedBox(height: 14),
-                    Text(statusText,
-                        style: const TextStyle(
-                            fontSize: 13, color: Colors.white70)),
+                    const SizedBox(height: 12),
+                    Text("${(progress * 100).toInt()}% completado",
+                        style: const TextStyle(fontSize: 13, color: Colors.white70)),
                   ],
                 ),
               );
@@ -497,12 +414,9 @@ class _PresenterScreenState extends State<PresenterScreen> {
         if (response.statusCode != 200) {
           throw Exception("HTTP ${response.statusCode}");
         }
-      } catch (pcErr) {
+      } catch (_) {
         final request = await client.getUrl(Uri.parse(githubLatestApkUrl));
         response = await request.close();
-        if (response.statusCode != 200) {
-          throw Exception("Error descargando desde GitHub: HTTP ${response.statusCode}");
-        }
       }
 
       final totalBytes = response.contentLength;
@@ -515,10 +429,6 @@ class _PresenterScreenState extends State<PresenterScreen> {
         if (dialogSetState != null && totalBytes > 0) {
           dialogSetState!(() {
             progress = receivedBytes / totalBytes;
-            final rec = (receivedBytes / (1024 * 1024)).toStringAsFixed(1);
-            final tot = (totalBytes / (1024 * 1024)).toStringAsFixed(1);
-            final pct = (progress * 100).toInt();
-            statusText = "$pct% ($rec / $tot MB)";
           });
         }
       });
@@ -534,16 +444,11 @@ class _PresenterScreenState extends State<PresenterScreen> {
 
       await _mediaChannel
           .invokeMethod('installApk', {'filePath': apkFile.path});
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         try {
           Navigator.of(context, rootNavigator: true).pop();
         } catch (_) {}
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("Error actualizando: $e"),
-              backgroundColor: Colors.redAccent),
-        );
       }
     }
   }
@@ -556,7 +461,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
         HapticFeedback.mediumImpact();
       } else if (action == "back") {
         HapticFeedback.lightImpact();
-        Future.delayed(const Duration(milliseconds: 100), () {
+        Future.delayed(const Duration(milliseconds: 90), () {
           HapticFeedback.lightImpact();
         });
       } else {
@@ -568,7 +473,6 @@ class _PresenterScreenState extends State<PresenterScreen> {
   Future<void> _startDiscovery({bool manual = false}) async {
     if (_isDiscovering) return;
     setState(() => _isDiscovering = true);
-    if (manual) _log("Buscando laptop en la red Wi-Fi...");
 
     try {
       _discoverySocket?.close();
@@ -598,7 +502,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     _isDiscovering = false;
                   });
                 }
-                _log("✓ ¡Laptop encontrada!: $target");
+                _log("✓ Laptop detectada: $target");
                 _discoveryTimeoutTimer?.cancel();
                 _discoverySocket?.close();
                 _discoverySocket = null;
@@ -615,15 +519,6 @@ class _PresenterScreenState extends State<PresenterScreen> {
       final probe = utf8.encode("DISCOVER_PRESENTER");
       _discoverySocket!.send(probe, InternetAddress("255.255.255.255"), 8889);
 
-      Future.delayed(const Duration(milliseconds: 700), () {
-        if (_isDiscovering && _discoverySocket != null) {
-          try {
-            _discoverySocket!
-                .send(probe, InternetAddress("255.255.255.255"), 8889);
-          } catch (_) {}
-        }
-      });
-
       _discoveryTimeoutTimer?.cancel();
       _discoveryTimeoutTimer = Timer(const Duration(seconds: 4), () {
         if (mounted && _isDiscovering) {
@@ -631,13 +526,18 @@ class _PresenterScreenState extends State<PresenterScreen> {
           _discoverySocket?.close();
           _discoverySocket = null;
           if (manual) {
-            _log("[-] No se encontró la laptop automáticamente. Puedes ingresar la IP.");
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    "No se detectó laptop automáticamente. Revisa que estén en el mismo Wi-Fi."),
+                duration: Duration(seconds: 3),
+              ),
+            );
           }
         }
       });
     } catch (e) {
       if (mounted) setState(() => _isDiscovering = false);
-      if (manual) _log("[!] Error en búsqueda: $e");
     }
   }
 
@@ -665,20 +565,20 @@ class _PresenterScreenState extends State<PresenterScreen> {
         (message) {
           if (!_isWsConnected) {
             setState(() => _isWsConnected = true);
-            _log("✓ Conectado a la laptop con éxito");
+            _log("✓ Conectado a la laptop");
             _checkForUpdates(manual: false);
           }
           try {
             final data = jsonDecode(message.toString());
             if (data['action'] == 'forward') {
-              _triggerAction("forward", "⏩ Diapositiva Siguiente",
+              _triggerAction("forward", "⏩ Siguiente Diapositiva",
                   "Avanzar presentación", const Color(0xFF38BDF8));
             } else if (data['action'] == 'back') {
               _triggerAction("back", "⏪ Diapositiva Anterior",
                   "Retroceder presentación", const Color(0xFFF43F5E));
             } else if (data['action'] == 'play_pause') {
-              _triggerAction("play_pause", "⏸️ Telón Negro (Pausa)",
-                  "Ocultar o pausar pantalla", const Color(0xFFA855F7));
+              _triggerAction("play_pause", "⏸️ Telón Negro",
+                  "Ocultar diapositiva", const Color(0xFFA855F7));
             }
           } catch (_) {}
         },
@@ -687,7 +587,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
           _wsReconnectTimer =
               Timer(const Duration(seconds: 3), _connectWebSocket);
         },
-        onError: (err) {
+        onError: (_) {
           setState(() => _isWsConnected = false);
           _wsReconnectTimer =
               Timer(const Duration(seconds: 3), _connectWebSocket);
@@ -697,7 +597,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
       _sendWs("hello");
       setState(() => _isWsConnected = true);
       _checkForUpdates(manual: false);
-    } catch (e) {
+    } catch (_) {
       setState(() => _isWsConnected = false);
       _wsReconnectTimer =
           Timer(const Duration(seconds: 3), _connectWebSocket);
@@ -720,14 +620,186 @@ class _PresenterScreenState extends State<PresenterScreen> {
     _triggerHaptic(action);
     _sendWs(action);
     setState(() {
-      _actionCount++;
-      _lastActionText = title;
+      _lastActionTitle = title;
       _lastActionSub = subtitle;
-      _flashColor = color.withValues(alpha: 0.15);
+      _flashColor = color.withValues(alpha: 0.2);
     });
-    Future.delayed(const Duration(milliseconds: 600), () {
+    Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) setState(() => _flashColor = Colors.transparent);
     });
+  }
+
+  void _openSettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    "Configuración y Conexión",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Laptop IP input
+                  const Text(
+                    "Dirección IP de tu Laptop",
+                    style: TextStyle(fontSize: 13, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF334155)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _pcController,
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.white),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              hintText: "Ej: 192.168.1.15:8888",
+                              hintStyle: TextStyle(color: Colors.white30),
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            _connectWebSocket();
+                            Navigator.pop(ctx);
+                          },
+                          child: const Text("Guardar",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Switches
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary:
+                        const Icon(Icons.vibration, color: Color(0xFF38BDF8)),
+                    title: const Text("Vibración al pulsar",
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    subtitle: const Text("Siente un toque táctil al cambiar",
+                        style: TextStyle(fontSize: 12, color: Colors.white60)),
+                    value: _hapticEnabled,
+                    activeTrackColor: const Color(0xFF38BDF8),
+                    onChanged: (val) {
+                      setState(() => _hapticEnabled = val);
+                      setSheetState(() {});
+                      if (val) _triggerHaptic("forward");
+                    },
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary:
+                        const Icon(Icons.headphones, color: Color(0xFF10B981)),
+                    title: const Text("Control con Auriculares",
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    subtitle: const Text(
+                        "Pasa diapositivas con el botón de tus audífonos",
+                        style: TextStyle(fontSize: 12, color: Colors.white60)),
+                    value: _isMediaActive,
+                    activeTrackColor: const Color(0xFF10B981),
+                    onChanged: (val) {
+                      _toggleMediaSession(val);
+                      setSheetState(() {});
+                    },
+                  ),
+                  const Divider(color: Color(0xFF334155), height: 20),
+
+                  // Actions row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF334155)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.system_update_alt,
+                              size: 18, color: Color(0xFF38BDF8)),
+                          label: const Text("Actualizaciones",
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 13)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _checkForUpdates(manual: true);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF334155)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.help_outline,
+                              size: 18, color: Color(0xFF10B981)),
+                          label: const Text("¿Cómo usar?",
+                              style: TextStyle(
+                                  color: Colors.white, fontSize: 13)),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _showHelpGuide();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showHelpGuide() {
@@ -735,18 +807,18 @@ class _PresenterScreenState extends State<PresenterScreen> {
       context: context,
       backgroundColor: const Color(0xFF1E293B),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
         return Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(22.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
                 child: Container(
-                  width: 40,
+                  width: 44,
                   height: 4,
                   decoration: BoxDecoration(
                     color: Colors.white24,
@@ -754,42 +826,43 @@ class _PresenterScreenState extends State<PresenterScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               const Text(
-                "¿Cómo usar BT Presenter?",
+                "¿Cómo pasar diapositivas?",
                 style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
+              _buildHelpRow(
+                Icons.touch_app,
+                "En esta Pantalla",
+                "Pulsa el botón grande azul para avanzar. El botón izquierdo retrocede y 'Telón' oculta la diapositiva.",
+                const Color(0xFF38BDF8),
+              ),
+              const SizedBox(height: 14),
               _buildHelpRow(
                 Icons.headphones,
                 "Con tus Auriculares Bluetooth",
-                "• 1 Toque (Siguiente canción) ➔ Pasa a la siguiente diapositiva\n• 2 Toques (Canción anterior) ➔ Vuelve atrás\n• Pausa ➔ Pone la pantalla en negro (ideal para Canva)",
-                const Color(0xFF38BDF8),
+                "• 1 toque (siguiente pista) ➔ Avanzar\n• 2 toques (pista anterior) ➔ Retroceder\n• Pausa ➔ Telón negro en Canva",
+                const Color(0xFF10B981),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               _buildHelpRow(
                 Icons.watch,
                 "Con tu Smartwatch",
-                "Gira la corona o pulsa los controles de música de tu reloj para cambiar de diapositiva sin tocar nada más.",
-                const Color(0xFF10B981),
-              ),
-              const SizedBox(height: 12),
-              _buildHelpRow(
-                Icons.phone_android,
-                "Con este Teléfono",
-                "También puedes usar los botones grandes en la pantalla para controlar tu presentación como un clicker profesional.",
+                "Gira la corona digital o usa los botones de música para controlar la presentación.",
                 const Color(0xFFA855F7),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF38BDF8),
                     foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
@@ -829,8 +902,8 @@ class _PresenterScreenState extends State<PresenterScreen> {
                       color: Colors.white)),
               const SizedBox(height: 2),
               Text(description,
-                  style:
-                      const TextStyle(fontSize: 12, color: Colors.white70, height: 1.3)),
+                  style: const TextStyle(
+                      fontSize: 12, color: Colors.white70, height: 1.3)),
             ],
           ),
         ),
@@ -856,634 +929,40 @@ class _PresenterScreenState extends State<PresenterScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 104,
-              height: 104,
+              width: 96,
+              height: 96,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(22),
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFF38BDF8).withValues(alpha: 0.25),
-                    blurRadius: 32,
+                    blurRadius: 30,
                     spreadRadius: 4,
                   ),
                 ],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(22),
-                child:
-                    Image.asset('assets/images/mascot.png', fit: BoxFit.cover),
+                child: Image.asset('assets/images/mascot.png', fit: BoxFit.cover),
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             const Text(
               'BT Presenter',
               style: TextStyle(
-                fontSize: 26,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
-                letterSpacing: 0.5,
               ),
             ),
             const SizedBox(height: 6),
             const Text(
-              'Control de diapositivas universal',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF94A3B8),
-              ),
-            ),
-            const SizedBox(height: 36),
-            const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
-              ),
+              'Control de presentaciones universal',
+              style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSparkyAssistantCard() {
-    String message;
-    Color statusColor;
-
-    if (_isWsConnected && _isBtConnected) {
-      message =
-          "¡Todo listo! Ya puedes pasar diapositivas usando tus auriculares ($_btDeviceName) o con los botones abajo.";
-      statusColor = const Color(0xFF10B981);
-    } else if (_isWsConnected && !_isBtConnected) {
-      message =
-          "Tu laptop está conectada. Puedes usar los botones de la app o conectar auriculares/reloj por Bluetooth.";
-      statusColor = const Color(0xFF38BDF8);
-    } else if (!_isWsConnected && _isBtConnected) {
-      message =
-          "Tus auriculares están listos. Pulsa 'Buscar mi Laptop' para conectarte a tu presentación.";
-      statusColor = const Color(0xFFF59E0B);
-    } else {
-      message =
-          "¡Bienvenido! Asegúrate de estar en el mismo Wi-Fi que tu laptop y pulsa 'Buscar mi Laptop'.";
-      statusColor = const Color(0xFF94A3B8);
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: statusColor.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: const Color(0xFF0F172A),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset('assets/images/mascot.png', fit: BoxFit.cover),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      "Asistente Sparky",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFFCBD5E1),
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLaptopCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _isWsConnected
-                      ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                      : const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.laptop_mac,
-                  color: _isWsConnected
-                      ? const Color(0xFF10B981)
-                      : const Color(0xFFF59E0B),
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "Laptop de Presentación",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      _isWsConnected
-                          ? "Conectada (${_pcController.text})"
-                          : "Sin conexión a la laptop",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _isWsConnected
-                            ? const Color(0xFF10B981)
-                            : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (_isWsConnected)
-                IconButton(
-                  icon: const Icon(Icons.sync,
-                      size: 20, color: Color(0xFF38BDF8)),
-                  tooltip: 'Reconectar',
-                  onPressed: _connectWebSocket,
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (!_isWsConnected)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0284C7),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                icon: _isDiscovering
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.radar, size: 20),
-                label: Text(
-                  _isDiscovering
-                      ? "Buscando laptop en la red..."
-                      : "🔍 Buscar mi Laptop",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                onPressed: _isDiscovering ? null : () => _startDiscovery(manual: true),
-              ),
-            ),
-          const SizedBox(height: 6),
-          Center(
-            child: TextButton(
-              onPressed: () {
-                setState(() => _showManualIp = !_showManualIp);
-              },
-              child: Text(
-                _showManualIp
-                    ? "Ocultar configuración manual"
-                    : "⚙️ Escribir dirección IP manualmente",
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF94A3B8),
-                ),
-              ),
-            ),
-          ),
-          if (_showManualIp)
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF334155)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _pcController,
-                      style: const TextStyle(fontSize: 13, color: Colors.white),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: "Ejemplo: 192.168.1.15:8888",
-                        hintStyle:
-                            TextStyle(color: Colors.white24, fontSize: 12),
-                      ),
-                    ),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF38BDF8),
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                    onPressed: _connectWebSocket,
-                    child: const Text("Conectar"),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildControlDeviceCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: _isBtConnected
-                  ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                  : Colors.white10,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              _isBtConnected ? Icons.headphones : Icons.bluetooth,
-              color: _isBtConnected
-                  ? const Color(0xFF10B981)
-                  : const Color(0xFF94A3B8),
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Dispositivo de Control",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _isBtConnected
-                      ? "Conectado: $_btDeviceName"
-                      : "Sin auriculares o reloj conectados",
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _isBtConnected
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFF94A3B8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh,
-                size: 20, color: Color(0xFF38BDF8)),
-            tooltip: 'Verificar Bluetooth',
-            onPressed: () {
-              _refreshBluetoothDevice();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(_isBtConnected
-                      ? "Dispositivo detectado: $_btDeviceName"
-                      : "No hay auriculares Bluetooth conectados aún"),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPresentationRemoteCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-            decoration: BoxDecoration(
-              color: _flashColor == Colors.transparent
-                  ? const Color(0xFF0F172A)
-                  : _flashColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _flashColor == Colors.transparent
-                    ? const Color(0xFF334155)
-                    : const Color(0xFF38BDF8),
-                width: 1.5,
-              ),
-            ),
-            child: Column(
-              children: [
-                Text(
-                  _lastActionText,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _lastActionSub,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF94A3B8),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: SizedBox(
-                  height: 54,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F172A),
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Color(0xFF334155)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: const Icon(Icons.arrow_back_ios_new, size: 16),
-                    label: const Text(
-                      "Anterior",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: () {
-                      _triggerAction(
-                        "back",
-                        "⏪ Diapositiva Anterior",
-                        "Presionado en pantalla",
-                        const Color(0xFFF43F5E),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                height: 54,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3B0764).withValues(alpha: 0.3),
-                    foregroundColor: const Color(0xFFD8B4FE),
-                    side: const BorderSide(color: Color(0xFFA855F7)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                  ),
-                  onPressed: () {
-                    _triggerAction(
-                      "play_pause",
-                      "⏸️ Telón Negro",
-                      "Ocultar diapositiva en pantalla",
-                      const Color(0xFFA855F7),
-                    );
-                  },
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.pause, size: 18),
-                      Text("Telón", style: TextStyle(fontSize: 10)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 4,
-                child: SizedBox(
-                  height: 54,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0284C7),
-                      foregroundColor: Colors.white,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    icon: const Icon(Icons.arrow_forward_ios, size: 18),
-                    label: const Text(
-                      "Siguiente",
-                      style:
-                          TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                    ),
-                    onPressed: () {
-                      _triggerAction(
-                        "forward",
-                        "⏩ Diapositiva Siguiente",
-                        "Presionado en pantalla",
-                        const Color(0xFF38BDF8),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPreferencesCard() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            secondary: const Icon(Icons.vibration, color: Color(0xFF38BDF8)),
-            title: const Text("Vibración al pulsar",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            subtitle: const Text("Siente una vibración al cambiar de página",
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-            value: _hapticEnabled,
-            activeTrackColor: const Color(0xFF38BDF8),
-            onChanged: (val) {
-              setState(() => _hapticEnabled = val);
-              if (val) _triggerHaptic("forward");
-            },
-          ),
-          const Divider(color: Color(0xFF334155), height: 1),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            secondary: const Icon(Icons.headphones, color: Color(0xFF10B981)),
-            title: const Text("Control con Auriculares",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            subtitle: const Text(
-                "Permite pasar diapositivas con el botón de tus audífonos",
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
-            value: _isMediaActive,
-            activeTrackColor: const Color(0xFF10B981),
-            onChanged: _toggleMediaSession,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActivityLogSection() {
-    return Column(
-      children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: () {
-            setState(() => _showActivityLog = !_showActivityLog);
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _showActivityLog
-                      ? Icons.keyboard_arrow_up
-                      : Icons.keyboard_arrow_down,
-                  color: const Color(0xFF94A3B8),
-                  size: 20,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  _showActivityLog
-                      ? "Ocultar registro de actividad"
-                      : "Ver registro de actividad ($_actionCount eventos)",
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF94A3B8),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_showActivityLog)
-          Container(
-            height: 120,
-            margin: const EdgeInsets.only(top: 6),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF0F172A),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF334155)),
-            ),
-            child: _logs.isEmpty
-                ? const Center(
-                    child: Text(
-                      "Sin eventos aún",
-                      style: TextStyle(fontSize: 11, color: Colors.white30),
-                    ),
-                  )
-                : ListView.builder(
-                    itemCount: _logs.length,
-                    itemBuilder: (context, i) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2.0),
-                        child: Text(
-                          _logs[i],
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF94A3B8),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-      ],
     );
   }
 
@@ -1512,121 +991,284 @@ class _PresenterScreenState extends State<PresenterScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'BT Presenter',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                Text(
-                  _isWsConnected
-                      ? "Laptop conectada"
-                      : "Sin conexión a la laptop",
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: _isWsConnected
-                        ? const Color(0xFF10B981)
-                        : const Color(0xFFF59E0B),
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+            const Text(
+              'BT Presenter',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline, color: Color(0xFF94A3B8)),
-            tooltip: 'Cómo usar',
-            onPressed: _showHelpGuide,
+          // Estado de conexión Laptop
+          GestureDetector(
+            onTap: _isWsConnected
+                ? _openSettingsSheet
+                : () => _startDiscovery(manual: true),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _isWsConnected
+                    ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                    : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _isWsConnected
+                      ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                      : const Color(0xFFF59E0B).withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: _isWsConnected
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFF59E0B),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _isWsConnected
+                        ? "Laptop Conectada"
+                        : (_isDiscovering ? "Buscando..." : "Buscar Laptop"),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _isWsConnected
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFF59E0B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
           IconButton(
-            icon: const Icon(Icons.system_update_alt,
-                size: 20, color: Color(0xFF38BDF8)),
-            tooltip: 'Buscar actualización',
-            onPressed: () => _checkForUpdates(manual: true),
+            icon: const Icon(Icons.settings, color: Colors.white70, size: 22),
+            tooltip: 'Configuración',
+            onPressed: _openSettingsSheet,
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!_permissionsGranted && Platform.isAndroid)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF450A0A).withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.5)),
+              // 1. Visor de Acción (Hero Feedback)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: _flashColor == Colors.transparent
+                      ? const Color(0xFF1E293B)
+                      : _flashColor,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _flashColor == Colors.transparent
+                        ? const Color(0xFF334155)
+                        : const Color(0xFF38BDF8),
+                    width: 1.5,
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.bluetooth_disabled, color: Color(0xFFEF4444), size: 20),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          "Se requiere permiso Bluetooth para detectar tus dispositivos.",
-                          style: TextStyle(fontSize: 12, color: Color(0xFFFCA5A5)),
-                        ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      _lastActionTitle,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      TextButton(
-                        onPressed: _requestPermissions,
-                        child: const Text("Conceder", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _lastActionSub,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFCBD5E1),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // 2. Gran Botón SIGUIENTE (Ocupa la mayor parte del clicker)
+              Expanded(
+                flex: 5,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7), // Sky 600
+                    foregroundColor: Colors.white,
+                    elevation: 4,
+                    shadowColor: const Color(0xFF0284C7).withValues(alpha: 0.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                  ),
+                  onPressed: () {
+                    _triggerAction(
+                      "forward",
+                      "⏩ Siguiente Diapositiva",
+                      "Pulsado en la pantalla",
+                      const Color(0xFF38BDF8),
+                    );
+                  },
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.arrow_forward_ios_rounded,
+                          size: 42, color: Colors.white),
+                      SizedBox(height: 10),
+                      Text(
+                        "SIGUIENTE",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
                       ),
                     ],
                   ),
                 ),
-              if (!_batteryOptIgnored && Platform.isAndroid)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF451A03).withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.battery_alert, color: Color(0xFFF59E0B), size: 20),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          "Permite que la app funcione sin pausas con la pantalla apagada.",
-                          style: TextStyle(fontSize: 12, color: Color(0xFFFDE68A)),
+              ),
+
+              const SizedBox(height: 12),
+
+              // 3. Fila de Botones Secundarios: ANTERIOR y TELÓN NEGRO
+              Expanded(
+                flex: 2,
+                child: Row(
+                  children: [
+                    // Botón Anterior
+                    Expanded(
+                      flex: 3,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E293B),
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(
+                              color: Color(0xFF334155), width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          await Permission.ignoreBatteryOptimizations.request();
-                          final ok = await Permission.ignoreBatteryOptimizations.isGranted;
-                          if (mounted) setState(() => _batteryOptIgnored = ok);
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                            size: 20),
+                        label: const Text(
+                          "Anterior",
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () {
+                          _triggerAction(
+                            "back",
+                            "⏪ Diapositiva Anterior",
+                            "Pulsado en la pantalla",
+                            const Color(0xFFF43F5E),
+                          );
                         },
-                        child: const Text("Activar", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFF59E0B))),
                       ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Botón Telón Negro (Canva / PowerPoint)
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor:
+                              const Color(0xFF581C87).withValues(alpha: 0.35),
+                          foregroundColor: const Color(0xFFE9D5FF),
+                          side: const BorderSide(
+                              color: Color(0xFFA855F7), width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        onPressed: () {
+                          _triggerAction(
+                            "play_pause",
+                            "⏸️ Telón Negro",
+                            "Pantalla en pausa / oculta",
+                            const Color(0xFFA855F7),
+                          );
+                        },
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.pause_circle_outline, size: 22),
+                            SizedBox(height: 2),
+                            Text(
+                              "Telón",
+                              style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              // 4. Barra Inferior Dispositivo Bluetooth (Minimalista y Táctil)
+              GestureDetector(
+                onTap: _showHelpGuide,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _isBtConnected ? Icons.headphones : Icons.bluetooth,
+                        color: _isBtConnected
+                            ? const Color(0xFF10B981)
+                            : const Color(0xFF94A3B8),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _isBtConnected
+                              ? "Control: $_btDeviceName"
+                              : "🎧 Toca aquí para ver cómo usar audífonos o reloj",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: _isBtConnected
+                                ? Colors.white
+                                : const Color(0xFF94A3B8),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_hapticEnabled)
+                        const Icon(Icons.vibration,
+                            size: 16, color: Colors.white38),
                     ],
                   ),
                 ),
-              _buildSparkyAssistantCard(),
-              const SizedBox(height: 12),
-              _buildLaptopCard(),
-              const SizedBox(height: 12),
-              _buildControlDeviceCard(),
-              const SizedBox(height: 12),
-              _buildPresentationRemoteCard(),
-              const SizedBox(height: 12),
-              _buildPreferencesCard(),
-              const SizedBox(height: 12),
-              _buildActivityLogSection(),
-              const SizedBox(height: 16),
+              ),
             ],
           ),
         ),

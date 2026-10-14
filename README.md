@@ -35,18 +35,29 @@ Durante las pruebas se aisló la firma del servicio y características GATT:
 
 ---
 
-## 🚀 Instalación y Requisitos
+## ⚡ Onboarding Rápido para Laptop (Recomendado)
+
+Si estás instalando esto en tu laptop, preparamos un asistente automatizado que configura permisos de kernel `/dev/uinput`, entorno virtual, firewall y certificados SSL en 1 solo comando:
+
+```bash
+git clone https://github.com/EDGAR-BRI/smartwatch-ble-remote.git
+cd smartwatch-ble-remote
+./setup_laptop.sh
+```
+
+📖 **Consulta la [Guía Completa de Onboarding (ONBOARDING.md)](ONBOARDING.md)** para instrucciones paso a paso, alias para tu terminal y configuración de servicio en segundo plano.
+
+---
+
+## 🚀 Instalación Manual y Requisitos
 
 ### Requisitos del sistema
 - Linux (Ubuntu, Debian, Arch, Fedora, etc.)
 - Python 3.10+
 - BlueZ y permisos de escritura en `/dev/uinput` (ver sección de permisos abajo).
 
-### Clonar y preparar el entorno virtual
+### Preparar el entorno virtual manualmente
 ```bash
-git clone https://github.com/EDGAR-BRI/smartwatch-ble-remote.git
-cd smartwatch-ble-remote
-
 # Crear entorno virtual e instalar dependencias
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt

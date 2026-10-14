@@ -23,7 +23,7 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.10+11";
+const String appVersion = "1.0.11+12";
 const String githubLatestApkUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/SmartwatchPresenter.apk";
 const String githubLatestReleaseUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
@@ -44,10 +44,10 @@ class SmartwatchPresenterApp extends StatelessWidget {
       title: 'Smartwatch Presenter',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        scaffoldBackgroundColor: const Color(0xFF070A11),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF38BDF8),
-          surface: Color(0xFF1E293B),
+          primary: Color(0xFF00F0FF),
+          surface: Color(0xFF0E1526),
         ),
       ),
       home: const PresenterScreen(),
@@ -86,6 +86,9 @@ class _PresenterScreenState extends State<PresenterScreen> {
   bool _hapticEnabled = true;
   bool _isDiscovering = false;
   bool _showSplash = true;
+  int _bootStep = 0;
+  int _actionCount = 0;
+  Timer? _bootTimer;
   RawDatagramSocket? _discoverySocket;
   Timer? _discoveryTimeoutTimer;
   int? _lastSequence;
@@ -102,8 +105,16 @@ class _PresenterScreenState extends State<PresenterScreen> {
   }
 
   Future<void> _initApp() async {
-    Future.delayed(const Duration(milliseconds: 1800), () {
-      if (mounted) setState(() => _showSplash = false);
+    _bootTimer = Timer.periodic(const Duration(milliseconds: 400), (t) {
+      if (!mounted) return;
+      if (_bootStep < 4) {
+        setState(() => _bootStep++);
+      } else {
+        t.cancel();
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) setState(() => _showSplash = false);
+        });
+      }
     });
 
     try {
@@ -1034,6 +1045,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
 
   void _triggerFlash(Color color, String text) {
     setState(() {
+      _actionCount++;
       _flashColor = color.withValues(alpha: 0.25);
       _lastActionText = text;
     });
@@ -1044,6 +1056,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
 
   @override
   void dispose() {
+    _bootTimer?.cancel();
     _discoveryTimeoutTimer?.cancel();
     _discoverySocket?.close();
     _scanSub?.cancel();
@@ -1061,146 +1074,125 @@ class _PresenterScreenState extends State<PresenterScreen> {
   Widget _buildMascotCard() {
     String mascotMessage;
     Color accentColor;
-    IconData statusIcon;
-    String badgeText;
+    String statusText;
 
     if (_isBleConnected && _isWsConnected) {
-      mascotMessage = "¡Todo listo! Reloj y laptop sincronizados. Pasa diapositivas con toques o girando la corona.";
-      accentColor = const Color(0xFF22C55E);
-      statusIcon = Icons.check_circle;
-      badgeText = "CONECTADO";
+      mascotMessage = "Todo sincronizado. Inyectando KEY_RIGHT y KEY_LEFT en /dev/uinput.";
+      accentColor = const Color(0xFF10B981);
+      statusText = "ONLINE";
     } else if (_isBleConnected && !_isWsConnected) {
-      mascotMessage = "¡Smartwatch enlazado! Toca 📡 para auto-detectar tu laptop en la red Wi-Fi.";
-      accentColor = const Color(0xFF38BDF8);
-      statusIcon = Icons.wifi_find;
-      badgeText = "ENLACE BLE";
+      mascotMessage = "Smartwatch enlazado vía BLE NUS. Pulsa [RADAR] para enlazar laptop Wi-Fi.";
+      accentColor = const Color(0xFF00F0FF);
+      statusText = "BLE_ACTIVE";
     } else if (!_isBleConnected && _isWsConnected) {
-      mascotMessage = "¡Laptop conectada! Pulsa 'Escanear' o activa la música para vincular tu smartwatch.";
-      accentColor = Colors.amber;
-      statusIcon = Icons.bluetooth_searching;
-      badgeText = "BUSCANDO BLE";
+      mascotMessage = "Host WebSocket conectado. Escanea para vincular GATT NUS o rueda AVRCP.";
+      accentColor = const Color(0xFFF59E0B);
+      statusText = "WS_ACTIVE";
     } else {
-      mascotMessage = "¡Hola! Soy Sparky, tu copiloto de diapositivas. Conecta tu laptop y smartwatch para empezar.";
-      accentColor = const Color(0xFF38BDF8);
-      statusIcon = Icons.smart_toy;
-      badgeText = "ASISTENTE";
+      mascotMessage = "Esperando enlaces. Enlaza tu reloj por Bluetooth y tu laptop por Wi-Fi.";
+      accentColor = const Color(0xFF00F0FF);
+      statusText = "STANDBY";
     }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accentColor.withValues(alpha: 0.35), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: accentColor.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: const Color(0xFF0B1120),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: accentColor.withValues(alpha: 0.35), width: 1),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(6),
           onTap: () {
             HapticFeedback.lightImpact();
             ScaffoldMessenger.of(context).removeCurrentSnackBar();
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text("🤖 Sparky: '¡A romperla en la presentación! 1 toque = Avanzar | 2 = Retroceder'"),
+                content: Text(
+                  "⚡ Sparky: 'uinput activo. 1 toque = KEY_RIGHT | 2 toques = KEY_LEFT | Pausa = KEY_U'",
+                  style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+                ),
                 duration: Duration(seconds: 2),
-                backgroundColor: Color(0xFF1E293B),
+                backgroundColor: Color(0xFF0E1526),
               ),
             );
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Stack(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: accentColor, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: accentColor.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                          ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: Image.asset(
-                          'assets/images/mascot.png',
-                          fit: BoxFit.cover,
+                    Row(
+                      children: [
+                        Container(width: 6, height: 6, decoration: BoxDecoration(color: accentColor, shape: BoxShape.circle)),
+                        const SizedBox(width: 6),
+                        const Text(
+                          "sh -- sparky@copilot:status",
+                          style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF64748B)),
                         ),
-                      ),
+                      ],
                     ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF0F172A),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(statusIcon, size: 14, color: accentColor),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        statusText,
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 9, fontWeight: FontWeight.bold, color: accentColor),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0E1526),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: accentColor.withValues(alpha: 0.5), width: 1),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(5),
+                        child: Image.asset('assets/images/mascot.png', fit: BoxFit.cover),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            "Sparky",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: Colors.white,
+                          Text(
+                            "> $mascotMessage",
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              color: Color(0xFFCBD5E1),
+                              height: 1.3,
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: accentColor.withValues(alpha: 0.2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              badgeText,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: accentColor,
-                                letterSpacing: 0.5,
-                              ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "EVENTS: $_actionCount  •  BUS: /dev/uinput  •  LATENCY: <3ms",
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 9,
+                              color: Color(0xFF64748B),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        mascotMessage,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white70,
-                          height: 1.25,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1210,135 +1202,355 @@ class _PresenterScreenState extends State<PresenterScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_showSplash) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF090D16),
-        body: Center(
+  Widget _buildDeveloperSplashScreen() {
+    final bootLogs = [
+      "00.12s [SYS] Mounting Linux uinput driver...",
+      "00.45s [BLE] Bluetooth Low Energy GATT NUS armed",
+      "00.90s [NET] UDP Discovery beacon on :8889",
+      "01.40s [AVRCP] MediaSession event listener ready",
+      "01.90s [OK] Sparky presentation engine online",
+    ];
+
+    final progress = (_bootStep + 1) / 5.0;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF070A11),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF38BDF8).withValues(alpha: 0.3),
-                      blurRadius: 40,
-                      spreadRadius: 6,
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: Image.asset(
-                    'assets/images/mascot.png',
-                    width: 130,
-                    height: 130,
-                    fit: BoxFit.cover,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "SYS_BOOT // KERNEL v1.0.11",
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 11,
+                          color: Color(0xFF64748B),
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: () {
+                      _bootTimer?.cancel();
+                      if (mounted) setState(() => _showSplash = false);
+                    },
+                    child: const Text(
+                      "[ SALTAR ]",
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 11,
+                        color: Color(0xFF00F0FF),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Smartwatch Presenter',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00F0FF).withValues(alpha: 0.22),
+                              blurRadius: 40,
+                              spreadRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 116,
+                        height: 116,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0E1526),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFF00F0FF).withValues(alpha: 0.6),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(15),
+                          child: Image.asset(
+                            'assets/images/mascot.png',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "SMARTWATCH",
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "//",
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: const Color(0xFF00F0FF).withValues(alpha: 0.8),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        "PRESENTER",
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF00F0FF),
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    "LINUX INPUT INJECTOR • BLE + AVRCP PROTOCOL",
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      color: Color(0xFF94A3B8),
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'Tu muñeca tiene el control',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFF38BDF8),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 32),
-              const SizedBox(
-                width: 120,
-                child: LinearProgressIndicator(
-                  minHeight: 3,
-                  backgroundColor: Colors.white10,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Iniciando enlaces...',
-                style: TextStyle(color: Colors.white38, fontSize: 11),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF050811),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF1E293B),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "BOOT SEQUENCE (STDERR/STDOUT):",
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              "${(progress * 100).toInt()}%",
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 10,
+                                color: Color(0xFF00F0FF),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        for (int i = 0; i <= _bootStep && i < bootLogs.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0),
+                            child: Text(
+                              "> ${bootLogs[i]}",
+                              style: TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                color: i == _bootStep ? const Color(0xFF00F0FF) : const Color(0xFF10B981),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 3,
+                      backgroundColor: const Color(0xFF1E293B),
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF00F0FF)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
         ),
-      );
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_showSplash) {
+      return _buildDeveloperSplashScreen();
     }
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: const Color(0xFF090D14),
+        elevation: 0,
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(color: Color(0xFF1E293B), height: 1, thickness: 1),
+        ),
         leading: Padding(
-          padding: const EdgeInsets.only(left: 12.0, top: 10.0, bottom: 10.0),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              'assets/images/app_logo.png',
-              fit: BoxFit.cover,
+          padding: const EdgeInsets.only(left: 14.0, top: 12.0, bottom: 12.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF0E1526),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.4), width: 1),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(5),
+              child: Image.asset(
+                'assets/images/app_logo.png',
+                fit: BoxFit.cover,
+              ),
             ),
           ),
         ),
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            const Text('Smartwatch Presenter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text('v$appVersion • Rueda + Música + BLE', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.normal)),
+            const Text(
+              'PRESENTER',
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+                letterSpacing: 1.0,
+                color: Colors.white,
+              ),
+            ),
+            const Text(
+              '::DEV',
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: Color(0xFF00F0FF),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+              ),
+              child: Text(
+                'v$appVersion',
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                  color: Color(0xFF10B981),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ],
         ),
-        backgroundColor: const Color(0xFF1E293B),
         centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.system_update_alt, color: Color(0xFF38BDF8)),
+            icon: const Icon(Icons.system_update_alt, size: 20, color: Color(0xFF00F0FF)),
             tooltip: 'Buscar Actualización (OTA)',
             onPressed: () => _checkForUpdates(manual: true),
           ),
           IconButton(
-            icon: Icon(Icons.refresh, color: _isScanning ? Colors.amber : Colors.white),
+            icon: Icon(Icons.refresh, size: 20, color: _isScanning ? Colors.amber : Colors.white),
             tooltip: 'Escanear Bluetooth',
             onPressed: _startScan,
           ),
         ],
       ),
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+        padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 10.0),
         child: Column(
           children: [
-            // Banner de Bluetooth apagado o permisos
+            // Banner de Bluetooth apagado o permisos (Developer alert style)
             if (!_bluetoothEnabled)
               Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.redAccent),
+                  color: const Color(0xFF450A0A).withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFEF4444), width: 1),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.bluetooth_disabled, color: Colors.redAccent),
-                    const SizedBox(width: 10),
+                    const Icon(Icons.bluetooth_disabled, color: Color(0xFFEF4444), size: 18),
+                    const SizedBox(width: 8),
                     const Expanded(
-                      child: Text("El Bluetooth está apagado.", style: TextStyle(fontSize: 13)),
+                      child: Text(
+                        "ERR: Bluetooth desactivado en el sistema",
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFFFCA5A5)),
+                      ),
                     ),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFEF4444)),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
                       onPressed: () => FlutterBluePlus.turnOn(),
-                      child: const Text("Encender", style: TextStyle(color: Colors.white)),
+                      child: const Text("ENCENDER", style: TextStyle(fontFamily: 'monospace', color: Colors.white, fontSize: 10)),
                     ),
                   ],
                 ),
@@ -1347,56 +1559,76 @@ class _PresenterScreenState extends State<PresenterScreen> {
             // Banner de optimización de batería (Segundo Plano)
             if (!_batteryOptIgnored && Platform.isAndroid)
               Container(
-                margin: const EdgeInsets.only(bottom: 12),
+                margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                  color: const Color(0xFF451A03).withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFF59E0B), width: 1),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.battery_alert, color: Colors.amber, size: 20),
+                    const Icon(Icons.battery_alert, color: Color(0xFFF59E0B), size: 18),
                     const SizedBox(width: 8),
                     const Expanded(
-                      child: Text("Habilitar segundo plano sin cortes", style: TextStyle(fontSize: 12)),
+                      child: Text(
+                        "SYS: Habilitar segundo plano sin cortes",
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFFFDE68A)),
+                      ),
                     ),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.amber,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFF59E0B)),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                       ),
                       onPressed: () async {
                         await Permission.ignoreBatteryOptimizations.request();
                         final ok = await Permission.ignoreBatteryOptimizations.isGranted;
                         if (mounted) setState(() => _batteryOptIgnored = ok);
                       },
-                      child: const Text("Activar", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      child: const Text("ACTIVAR", style: TextStyle(fontFamily: 'monospace', color: Colors.white, fontSize: 10)),
                     ),
                   ],
                 ),
               ),
 
-            // Tarjeta Asistente Sparky (Mascota)
+            // Tarjeta Asistente Sparky (Mascota Copilot)
             _buildMascotCard(),
 
-            // Configuración IP PC
+            // Configuración IP PC (Developer Prompt Bar)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFF0B1120),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFF1E293B), width: 1),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.computer, color: Color(0xFF38BDF8)),
-                  const SizedBox(width: 12),
+                  const Text(
+                    "HOST >",
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      color: Color(0xFF00F0FF),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
                       controller: _pcController,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 12,
+                        color: Colors.white,
+                      ),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
-                        hintText: "IP de la PC (ej: 10.0.0.3:8888)",
+                        hintText: "10.0.0.3:8888",
+                        hintStyle: TextStyle(fontFamily: 'monospace', color: Colors.white24, fontSize: 12),
                         isDense: true,
                       ),
                     ),
@@ -1404,261 +1636,395 @@ class _PresenterScreenState extends State<PresenterScreen> {
                   IconButton(
                     icon: Icon(
                       Icons.radar,
-                      color: _isDiscovering ? Colors.amber : const Color(0xFF38BDF8),
+                      size: 18,
+                      color: _isDiscovering ? Colors.amber : const Color(0xFF00F0FF),
                     ),
-                    tooltip: 'Auto-detectar Laptop en Wi-Fi',
+                    tooltip: 'Auto-detectar Laptop (UDP Beacon)',
+                    visualDensity: VisualDensity.compact,
                     onPressed: () => _startDiscovery(manual: true),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.sync, color: Color(0xFF38BDF8)),
+                    icon: const Icon(Icons.sync, size: 18, color: Color(0xFF00F0FF)),
                     tooltip: 'Reconectar WebSocket',
+                    visualDensity: VisualDensity.compact,
                     onPressed: _connectWebSocket,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Estados de Conexión
-            Row(
-              children: [
-                Expanded(
-                  child: _StatusCard(
-                    title: "Reloj (BLE)",
-                    subtitle: _isBleConnected
-                        ? "Conectado ($_watchBattery)"
-                        : (_isScanning ? "Buscando..." : "Desconectado"),
-                    icon: Icons.watch,
-                    isConnected: _isBleConnected,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _StatusCard(
-                    title: "PC (Wi-Fi)",
-                    subtitle: _isWsConnected ? "Conectado" : "Desconectado",
-                    icon: Icons.wifi,
-                    isConnected: _isWsConnected,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Tarjeta de Controles Multimedia AVRCP
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _isMediaActive ? const Color(0xFF22C55E).withValues(alpha: 0.4) : Colors.white10,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _isMediaActive ? Icons.music_note : Icons.music_off,
-                    color: _isMediaActive ? const Color(0xFF22C55E) : Colors.white38,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text("Música y Rueda del Reloj", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        Text(
-                          _isMediaActive ? "Activo: ⏭️ Siguiente, ⏮️ Atrás y 🎛️ Rueda" : "Simulador desactivado",
-                          style: TextStyle(color: _isMediaActive ? const Color(0xFF22C55E) : Colors.white38, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: _isMediaActive,
-                    activeTrackColor: const Color(0xFF22C55E),
-                    onChanged: _toggleMediaSession,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 8),
 
+            // Telemetría de Nodos (Dual Node HUD)
+            Row(
+              children: [
+                Expanded(
+                  child: _StatusCard(
+                    title: "NODE: SMARTWATCH_BLE",
+                    subtitle: _isBleConnected
+                        ? "CONN: ACTIVE [$_watchBattery]"
+                        : (_isScanning ? "SCAN: BUSCANDO..." : "STATUS: OFFLINE"),
+                    icon: Icons.watch,
+                    isConnected: _isBleConnected,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatusCard(
+                    title: "NODE: LINUX_HOST_WS",
+                    subtitle: _isWsConnected ? "CONN: SYNCED (uinput)" : "STATUS: OFFLINE",
+                    icon: Icons.terminal,
+                    isConnected: _isWsConnected,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Tarjeta de Controles Multimedia AVRCP
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B1120),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _isMediaActive ? const Color(0xFF10B981).withValues(alpha: 0.4) : const Color(0xFF1E293B),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isMediaActive ? Icons.music_note : Icons.music_off,
+                    color: _isMediaActive ? const Color(0xFF10B981) : Colors.white24,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "AVRCP DAEMON (Música y Rueda Corona)",
+                          style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11),
+                        ),
+                        Text(
+                          _isMediaActive
+                              ? "MAP: KEY_NEXTSONG / PREVSONG ➔ /dev/uinput"
+                              : "STATUS: Inactivo (Pulsa para activar simulación)",
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            color: _isMediaActive ? const Color(0xFF10B981) : Colors.white38,
+                            fontSize: 9,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Transform.scale(
+                    scale: 0.8,
+                    child: Switch(
+                      value: _isMediaActive,
+                      activeTrackColor: const Color(0xFF10B981),
+                      onChanged: _toggleMediaSession,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+
             // Tarjeta de Feedback Háptico (Vibración en Bolsillo)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(12),
+                color: const Color(0xFF0B1120),
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: _hapticEnabled ? const Color(0xFF38BDF8).withValues(alpha: 0.3) : Colors.white10,
+                  color: _hapticEnabled ? const Color(0xFF00F0FF).withValues(alpha: 0.35) : const Color(0xFF1E293B),
+                  width: 1,
                 ),
               ),
               child: Row(
                 children: [
                   Icon(
                     _hapticEnabled ? Icons.vibration : Icons.mobile_off,
-                    color: _hapticEnabled ? const Color(0xFF38BDF8) : Colors.white38,
-                    size: 22,
+                    color: _hapticEnabled ? const Color(0xFF00F0FF) : Colors.white24,
+                    size: 20,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text("Vibración Háptica (Bolsillo)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const Text(
+                          "HAPTIC ENGINE (Vibración de Bolsillo)",
+                          style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11),
+                        ),
                         Text(
-                          _hapticEnabled ? "1 vib = ⏩ Avanzar | 2 vibs = ⏪ Retroceder" : "Vibración táctil desactivada",
-                          style: TextStyle(color: _hapticEnabled ? const Color(0xFF38BDF8) : Colors.white38, fontSize: 11),
+                          _hapticEnabled
+                              ? "FEEDBACK: 1x VIB (AVANCE) • 2x VIB (RETROCESO)"
+                              : "FEEDBACK: Desactivado",
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            color: _hapticEnabled ? const Color(0xFF00F0FF) : Colors.white38,
+                            fontSize: 9,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  Switch(
-                    value: _hapticEnabled,
-                    activeTrackColor: const Color(0xFF38BDF8),
-                    onChanged: (val) {
-                      setState(() => _hapticEnabled = val);
-                      if (val) _triggerHaptic("forward");
-                    },
+                  Transform.scale(
+                    scale: 0.8,
+                    child: Switch(
+                      value: _hapticEnabled,
+                      activeTrackColor: const Color(0xFF00F0FF),
+                      onChanged: (val) {
+                        setState(() => _hapticEnabled = val);
+                        if (val) _triggerHaptic("forward");
+                      },
+                    ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
             // Dispositivos encontrados (si no está conectado el reloj)
             if (!_isBleConnected && _discoveredMap.isNotEmpty) ...[
               Container(
-                height: 100,
+                height: 90,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white12),
+                  color: const Color(0xFF050811),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF1E293B), width: 1),
                 ),
                 child: ListView(
                   children: _discoveredMap.values.map((r) {
                     final name = r.device.platformName.isNotEmpty
                         ? r.device.platformName
-                        : (r.advertisementData.advName.isNotEmpty ? r.advertisementData.advName : "Dispositivo BLE");
+                        : (r.advertisementData.advName.isNotEmpty ? r.advertisementData.advName : "BLE_DEVICE");
                     return ListTile(
                       dense: true,
-                      leading: const Icon(Icons.bluetooth, color: Color(0xFF38BDF8)),
-                      title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      subtitle: Text(r.device.remoteId.str, style: const TextStyle(fontSize: 11, color: Colors.white54)),
-                      trailing: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0284C7),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                      leading: const Icon(Icons.bluetooth_searching, size: 18, color: Color(0xFF00F0FF)),
+                      title: Text(name, style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 11)),
+                      subtitle: Text(r.device.remoteId.str, style: const TextStyle(fontFamily: 'monospace', fontSize: 9, color: Colors.white54)),
+                      trailing: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF00F0FF)),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                         ),
                         onPressed: () => _connectToDevice(r.device),
-                        child: const Text("Conectar", style: TextStyle(fontSize: 12)),
+                        child: const Text("LINK", style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF00F0FF))),
                       ),
                     );
                   }).toList(),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
             ],
 
-            // Indicador Visual de Diapositiva
+            // Indicador Visual de Diapositiva (HUD de Inyección)
             AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+              duration: const Duration(milliseconds: 180),
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 20),
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
               decoration: BoxDecoration(
-                color: _flashColor == Colors.transparent ? const Color(0xFF1E293B) : _flashColor,
-                borderRadius: BorderRadius.circular(16),
+                color: _flashColor == Colors.transparent ? const Color(0xFF090D16) : _flashColor,
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: _flashColor == Colors.transparent ? Colors.white10 : const Color(0xFF38BDF8),
-                  width: 2,
+                  color: _flashColor == Colors.transparent ? const Color(0xFF1E293B) : const Color(0xFF00F0FF),
+                  width: 1.5,
                 ),
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.touch_app, size: 40, color: Color(0xFF38BDF8)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "INJECTOR: /dev/uinput",
+                        style: TextStyle(fontFamily: 'monospace', fontSize: 9, color: Color(0xFF64748B)),
+                      ),
+                      Text(
+                        "SEQ: ${_lastSequence ?? 'IDLE'}",
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 9, color: Color(0xFF00F0FF)),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 6),
                   Text(
                     _lastActionText,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.0,
+                      color: Colors.white,
+                    ),
                   ),
                   const SizedBox(height: 4),
-                  const Text("1 toque = Siguiente | 2 toques = Anterior",
-                      style: TextStyle(color: Colors.white54, fontSize: 11)),
+                  const Text(
+                    "1 toque = KEY_RIGHT  |  2 toques = KEY_LEFT  |  Pausa = KEY_U",
+                    style: TextStyle(fontFamily: 'monospace', color: Colors.white38, fontSize: 10),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
-            // Botones de Prueba Manual
+            // Botones de Prueba Manual (Mechanical Keycaps Style)
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor: const Color(0xFF1E293B),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      backgroundColor: const Color(0xFF090D16),
+                      side: const BorderSide(color: Color(0xFF1E293B), width: 1),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                     ),
-                    icon: const Icon(Icons.arrow_back, size: 18),
-                    label: const Text("Atrás"),
                     onPressed: () {
                       _triggerHaptic("back");
-                      _triggerFlash(const Color(0xFF38BDF8), "⏪ RETROCEDER");
+                      _triggerFlash(const Color(0xFF00F0FF), "⏪ KEY_LEFT (ATRÁS)");
                       _sendWs("back");
                     },
+                    child: const Text(
+                      "[ ◀ KEY_LEFT ]",
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: Color(0xFFCBD5E1),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                    backgroundColor: const Color(0xFF581C87),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    backgroundColor: const Color(0xFF3B0764).withValues(alpha: 0.35),
+                    side: const BorderSide(color: Color(0xFFA855F7), width: 1),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                   ),
-                  icon: const Icon(Icons.pause, size: 18, color: Colors.purpleAccent),
-                  label: const Text("U", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                   onPressed: () {
                     _triggerHaptic("play_pause");
-                    _triggerFlash(Colors.purpleAccent, "⏯️ PAUSA (U)");
+                    _triggerFlash(Colors.purpleAccent, "⏯️ KEY_U (TELÓN)");
                     _sendWs("play_pause");
                   },
+                  child: const Text(
+                    "[ ⏸ KEY_U ]",
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      color: Color(0xFFD8B4FE),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: ElevatedButton.icon(
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       backgroundColor: const Color(0xFF0284C7),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                     ),
-                    icon: const Icon(Icons.arrow_forward, size: 18),
-                    label: const Text("Adelante"),
                     onPressed: () {
                       _triggerHaptic("forward");
-                      _triggerFlash(const Color(0xFF22C55E), "⏩ AVANZAR");
+                      _triggerFlash(const Color(0xFF10B981), "⏩ KEY_RIGHT (ADELANTE)");
                       _sendWs("forward");
                     },
+                    child: const Text(
+                      "[ KEY_RIGHT ▶ ]",
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
-            // Registro de Consola / Logs
+            // Registro de Consola / Terminal (stdout /dev/pts/1)
             Expanded(
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF090D16),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white10),
+                  color: const Color(0xFF050811),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF1E293B), width: 1),
                 ),
-                child: ListView.builder(
-                  itemCount: _logs.length,
-                  itemBuilder: (context, i) => Text(
-                    _logs[i],
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.white70),
-                  ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF090D16),
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
+                        border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle)),
+                              const SizedBox(width: 4),
+                              Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFFF59E0B), shape: BoxShape.circle)),
+                              const SizedBox(width: 4),
+                              Container(width: 6, height: 6, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+                              const SizedBox(width: 8),
+                              const Text(
+                                "stdout :: /dev/pts/1",
+                                style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                          InkWell(
+                            onTap: () => setState(() => _logs.clear()),
+                            child: const Text(
+                              "[ LIMPIAR ]",
+                              style: TextStyle(fontFamily: 'monospace', fontSize: 9, color: Color(0xFF64748B)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(8),
+                        itemCount: _logs.length,
+                        itemBuilder: (context, i) {
+                          final line = _logs[i];
+                          Color textColor = const Color(0xFF94A3B8);
+                          if (line.contains("[!]")) {
+                            textColor = const Color(0xFFF87171);
+                          } else if (line.contains("✓") || line.contains("[OK]")) {
+                            textColor = const Color(0xFF34D399);
+                          } else if (line.contains("🎯") || line.contains("RX")) {
+                            textColor = const Color(0xFF38BDF8);
+                          } else if (line.contains("🎵")) {
+                            textColor = const Color(0xFFC084FC);
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 1.0),
+                            child: Text(
+                              line,
+                              style: TextStyle(fontFamily: 'monospace', fontSize: 10, color: textColor),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1684,24 +2050,57 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = isConnected ? const Color(0xFF10B981) : const Color(0xFFEF4444);
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(12),
+        color: const Color(0xFF090D16),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isConnected ? color.withValues(alpha: 0.35) : const Color(0xFF1E293B),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
-          Icon(icon, color: isConnected ? Colors.greenAccent : Colors.redAccent, size: 26),
+          Icon(icon, color: color, size: 20),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                Text(subtitle,
-                    style: TextStyle(color: isConnected ? Colors.greenAccent : Colors.white54, fontSize: 11),
-                    overflow: TextOverflow.ellipsis),
+                Row(
+                  children: [
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    color: color,
+                    fontSize: 10,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),

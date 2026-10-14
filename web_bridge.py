@@ -72,7 +72,7 @@ def get_local_ip():
 
 
 GITHUB_REPO = "EDGAR-BRI/smartwatch-ble-remote"
-GITHUB_LATEST_RELEASE_APK_URL = f"https://github.com/{GITHUB_REPO}/releases/latest/download/BTClicker.apk"
+GITHUB_LATEST_RELEASE_APK_URL = f"https://github.com/{GITHUB_REPO}/releases/latest/download/BTPresenter.apk"
 GITHUB_LATEST_RELEASE_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
 
 
@@ -128,7 +128,7 @@ def get_app_version_info():
         "size_mb": size_mb,
         "build_time": build_time,
         "mtime": mtime,
-        "filename": f"BTClicker-v{version_name}.apk",
+        "filename": f"BTPresenter-v{version_name}.apk",
         "github_apk_url": GITHUB_LATEST_RELEASE_APK_URL,
         "github_release_url": GITHUB_LATEST_RELEASE_PAGE,
     }
@@ -266,10 +266,10 @@ class DiscoveryProtocol(asyncio.DatagramProtocol):
     def datagram_received(self, data, addr):
         try:
             msg = data.decode("utf-8", errors="ignore").strip()
-            if "DISCOVER" in msg or "SMARTWATCH" in msg or "PRESENTER" in msg or "BTCLICKER" in msg or "CLICKER" in msg:
+            if "DISCOVER" in msg or "SMARTWATCH" in msg or "PRESENTER" in msg or "BTPRESENTER" in msg or "CLICKER" in msg:
                 info = get_app_version_info()
                 response = json.dumps({
-                    "service": "bt-clicker",
+                    "service": "bt-presenter",
                     "ip": self.local_ip,
                     "port": self.port,
                     "http_port": self.http_port,
@@ -286,7 +286,7 @@ async def broadcast_beacon(transport, local_ip, port=8888, http_port=8080):
         try:
             info = get_app_version_info()
             beacon = json.dumps({
-                "service": "bt-clicker",
+                "service": "bt-presenter",
                 "ip": local_ip,
                 "port": port,
                 "http_port": http_port,
@@ -305,6 +305,7 @@ async def main():
     app.router.add_get("/", bridge.handle_index)
     app.router.add_static("/static", os.path.join(os.path.dirname(__file__), "static"))
     app.router.add_get("/ws", bridge.handle_ws)
+    app.router.add_get("/BTPresenter.apk", bridge.handle_download)
     app.router.add_get("/BTClicker.apk", bridge.handle_download)
     app.router.add_get("/SmartwatchPresenter.apk", bridge.handle_download)
     app.router.add_get("/app.apk", bridge.handle_download)
@@ -341,7 +342,7 @@ async def main():
     beacon_task = asyncio.create_task(broadcast_beacon(udp_transport, local_ip, 8888, 8080))
     info = get_app_version_info()
     print("\n" + "=" * 70)
-    print("  BT CLICKER // LINUX uinput ACTIVO (RELOJ / AURICULARES / BLE ➔ PC)")
+    print("  BT PRESENTER // LINUX uinput ACTIVO (RELOJ / AURICULARES / BLE ➔ PC)")
     print("=" * 70)
     print(f"  📦 Versión App Android: v{info['version']} ({info['size_mb']})")
     print(f"  🕒 Compilación: {info['build_time']}")
@@ -353,7 +354,7 @@ async def main():
     print("▶ MÉTODO A (Por Wi-Fi sin cables):")
     print("  1. En Google Chrome de tu teléfono para descargar la app o usar web:")
     print(f"     👉 https://{local_ip}:8888")
-    print("  2. En la App Android 'BT Clicker':")
+    print("  2. En la App Android 'BT Presenter':")
     print(f"     Escribe en el campo de IP: {local_ip}:8888 y pulsa 🔄")
     print("")
     print("▶ MÉTODO B (Por cable USB / ADB sin depender de Wi-Fi):")

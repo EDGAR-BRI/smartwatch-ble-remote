@@ -23,8 +23,8 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.12+13";
-const String githubLatestApkUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/BTClicker.apk";
+const String appVersion = "1.1.0+14";
+const String githubLatestApkUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/BTPresenter.apk";
 const String githubLatestReleaseUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
 const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media_session');
@@ -32,16 +32,16 @@ const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = DevHttpOverrides();
-  runApp(const BTClickerApp());
+  runApp(const BTPresenterApp());
 }
 
-class BTClickerApp extends StatelessWidget {
-  const BTClickerApp({super.key});
+class BTPresenterApp extends StatelessWidget {
+  const BTPresenterApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'BT Clicker',
+      title: 'BT Presenter',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF070A11),
@@ -1111,7 +1111,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  "⚡ Sparky: 'BT Clicker: 1 toque = KEY_RIGHT | 2 toques = KEY_LEFT | Pausa = KEY_U'",
+                  "⚡ Sparky: 'BT Presenter: 1 toque = KEY_RIGHT | 2 toques = KEY_LEFT | Pausa = KEY_U'",
                   style: TextStyle(fontFamily: 'monospace', fontSize: 12),
                 ),
                 duration: Duration(seconds: 2),
@@ -1208,7 +1208,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
       "00.45s [BLE] Bluetooth Low Energy GATT NUS armed",
       "00.90s [NET] UDP Discovery beacon on :8889",
       "01.40s [AVRCP] MediaSession event listener ready",
-      "01.90s [OK] Sparky BT Clicker engine online",
+      "01.90s [OK] Sparky BT Presenter engine online",
     ];
 
     final progress = (_bootStep + 1) / 5.0;
@@ -1236,7 +1236,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        "SYS_BOOT // KERNEL v1.0.12",
+                        "SYS_BOOT // KERNEL v1.1.0",
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 11,
@@ -1334,7 +1334,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        "CLICKER",
+                        "PRESENTER",
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 22,
@@ -1466,7 +1466,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
         title: Row(
           children: [
             const Text(
-              'BT CLICKER',
+              'BT PRESENTER',
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w900,

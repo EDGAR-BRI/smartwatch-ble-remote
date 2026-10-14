@@ -3,6 +3,12 @@ package com.edgardev.mobile_app
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothProfile
+import android.bluetooth.BluetoothA2dp
+import android.bluetooth.BluetoothHeadset
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -40,6 +46,12 @@ class MainActivity : FlutterActivity() {
     private var audioTrack: AudioTrack? = null
     private var isSilentAudioRunning = false
     private var audioThread: Thread? = null
+
+    // Detección de dispositivos Bluetooth conectados (Smartwatch, Audífonos, etc.)
+    private var bluetoothReceiver: BroadcastReceiver? = null
+    private var connectedDeviceName: String? = null
+    private var a2dpProxy: BluetoothA2dp? = null
+    private var headsetProxy: BluetoothHeadset? = null
 
     // Debounce de 140ms para evitar saltos dobles al girar la corona/rueda rápidamente
     private var lastActionTime = 0L
@@ -128,9 +140,17 @@ class MainActivity : FlutterActivity() {
                 "hasVibrator" -> {
                     result.success(checkHasVibrator())
                 }
+                "getConnectedBluetoothDevice" -> {
+                    val name = getActiveBluetoothDeviceName() ?: connectedDeviceName
+                    result.success(mapOf(
+                        "connected" to (name != null),
+                        "name" to (name ?: "")
+                    ))
+                }
                 else -> result.notImplemented()
             }
         }
+        registerBluetoothReceiver()
     }
 
     private fun startMediaSession() {
@@ -182,7 +202,7 @@ class MainActivity : FlutterActivity() {
                 // 3. Metadatos multimedia
                 val metadataBuilder = MediaMetadata.Builder()
                     .putString(MediaMetadata.METADATA_KEY_TITLE, "Control de Diapositivas")
-                    .putString(MediaMetadata.METADATA_KEY_ARTIST, "Smartwatch Presenter")
+                    .putString(MediaMetadata.METADATA_KEY_ARTIST, "AirPresenter")
                     .putString(MediaMetadata.METADATA_KEY_ALBUM, "Presentación")
                     .putLong(MediaMetadata.METADATA_KEY_DURATION, -1L)
 
@@ -281,7 +301,7 @@ class MainActivity : FlutterActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
                     CHANNEL_ID,
-                    "Smartwatch Presenter en Segundo Plano",
+                    "AirPresenter en Segundo Plano",
                     NotificationManager.IMPORTANCE_LOW
                 ).apply {
                     description = "Mantiene los controles multimedia y la conexión activos en segundo plano"
@@ -296,8 +316,8 @@ class MainActivity : FlutterActivity() {
                 @Suppress("DEPRECATION")
                 Notification.Builder(this)
             }
-                .setContentTitle("Smartwatch Presenter Activo")
-                .setContentText("Controlando diapositivas en segundo plano (Rueda + Música)")
+                .setContentTitle("AirPresenter Activo")
+                .setContentText("Controlando diapositivas en segundo plano (Reloj / Audífonos)")
                 .setSmallIcon(android.R.drawable.ic_media_play)
                 .setOngoing(true)
                 .build()
@@ -417,6 +437,12 @@ class MainActivity : FlutterActivity() {
         val now = System.currentTimeMillis()
         if (now - lastActionTime < THROTTLE_MS) return
         lastActionTime = now
+
+        if (connectedDeviceName == null) {
+            val name = getActiveBluetoothDeviceName() ?: "Dispositivo Bluetooth"
+            connectedDeviceName = name
+            notifyBluetoothState(true, name)
+        }
 
         runOnUiThread {
             methodChannel?.invokeMethod("onMediaAction", action)
@@ -606,8 +632,159 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) {}
     }
 
+    private fun registerBluetoothReceiver() {
+        if (bluetoothReceiver != null) return
+        try {
+            val filter = IntentFilter().apply {
+                addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+                addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+                addAction(BluetoothAdapter.ACTION_STATE_CHANGED)
+                addAction(BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED)
+                addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)
+            }
+            bluetoothReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    val action = intent?.action ?: return
+                    when (action) {
+                        BluetoothDevice.ACTION_ACL_CONNECTED,
+                        BluetoothA2dp.ACTION_CONNECTION_STATE_CHANGED,
+                        BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED -> {
+                            val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                            } else {
+                                @Suppress("DEPRECATION")
+                                intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                            }
+                            val name = try { device?.name } catch (_: SecurityException) { null }
+                                ?: getActiveBluetoothDeviceName() ?: "Dispositivo Bluetooth"
+                            connectedDeviceName = name
+                            notifyBluetoothState(true, name)
+                        }
+                        BluetoothDevice.ACTION_ACL_DISCONNECTED -> {
+                            val activeName = getActiveBluetoothDeviceName()
+                            if (activeName != null) {
+                                connectedDeviceName = activeName
+                                notifyBluetoothState(true, activeName)
+                            } else {
+                                connectedDeviceName = null
+                                notifyBluetoothState(false, "")
+                            }
+                        }
+                        BluetoothAdapter.ACTION_STATE_CHANGED -> {
+                            val state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)
+                            if (state == BluetoothAdapter.STATE_OFF) {
+                                connectedDeviceName = null
+                                notifyBluetoothState(false, "")
+                            } else if (state == BluetoothAdapter.STATE_ON) {
+                                queryInitialBluetoothDevice()
+                            }
+                        }
+                    }
+                }
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(bluetoothReceiver, filter, Context.RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(bluetoothReceiver, filter)
+            }
+            setupBluetoothProfileProxies()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun setupBluetoothProfileProxies() {
+        try {
+            val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            val adapter = btManager?.adapter ?: BluetoothAdapter.getDefaultAdapter() ?: return
+            if (!adapter.isEnabled) return
+
+            adapter.getProfileProxy(this, object : BluetoothProfile.ServiceListener {
+                override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                    if (profile == BluetoothProfile.A2DP) {
+                        a2dpProxy = proxy as? BluetoothA2dp
+                    } else if (profile == BluetoothProfile.HEADSET) {
+                        headsetProxy = proxy as? BluetoothHeadset
+                    }
+                    queryInitialBluetoothDevice()
+                }
+                override fun onServiceDisconnected(profile: Int) {
+                    if (profile == BluetoothProfile.A2DP) a2dpProxy = null
+                    if (profile == BluetoothProfile.HEADSET) headsetProxy = null
+                }
+            }, BluetoothProfile.A2DP)
+
+            adapter.getProfileProxy(this, object : BluetoothProfile.ServiceListener {
+                override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                    if (profile == BluetoothProfile.HEADSET) {
+                        headsetProxy = proxy as? BluetoothHeadset
+                    }
+                    queryInitialBluetoothDevice()
+                }
+                override fun onServiceDisconnected(profile: Int) {
+                    if (profile == BluetoothProfile.HEADSET) headsetProxy = null
+                }
+            }, BluetoothProfile.HEADSET)
+        } catch (_: Exception) {}
+    }
+
+    private fun getActiveBluetoothDeviceName(): String? {
+        try {
+            a2dpProxy?.connectedDevices?.firstOrNull()?.let { dev ->
+                val name = try { dev.name } catch (_: SecurityException) { null }
+                if (!name.isNullOrBlank()) return name
+            }
+            headsetProxy?.connectedDevices?.firstOrNull()?.let { dev ->
+                val name = try { dev.name } catch (_: SecurityException) { null }
+                if (!name.isNullOrBlank()) return name
+            }
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            if (audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn) {
+                return connectedDeviceName ?: "Dispositivo Bluetooth"
+            }
+        } catch (_: Exception) {}
+        return null
+    }
+
+    private fun queryInitialBluetoothDevice() {
+        mainHandler.postDelayed({
+            val name = getActiveBluetoothDeviceName()
+            if (name != null) {
+                connectedDeviceName = name
+                notifyBluetoothState(true, name)
+            } else if (connectedDeviceName != null) {
+                notifyBluetoothState(true, connectedDeviceName!!)
+            } else {
+                notifyBluetoothState(false, "")
+            }
+        }, 350)
+    }
+
+    private fun notifyBluetoothState(connected: Boolean, name: String) {
+        runOnUiThread {
+            methodChannel?.invokeMethod("onBluetoothDeviceState", mapOf(
+                "connected" to connected,
+                "name" to name
+            ))
+        }
+    }
+
     override fun onDestroy() {
         unregisterVolumeListeners()
+        try {
+            bluetoothReceiver?.let {
+                unregisterReceiver(it)
+                bluetoothReceiver = null
+            }
+        } catch (_: Exception) {}
+        try {
+            val btManager = getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            val adapter = btManager?.adapter ?: BluetoothAdapter.getDefaultAdapter()
+            if (adapter != null) {
+                a2dpProxy?.let { adapter.closeProfileProxy(BluetoothProfile.A2DP, it) }
+                headsetProxy?.let { adapter.closeProfileProxy(BluetoothProfile.HEADSET, it) }
+            }
+        } catch (_: Exception) {}
         stopMediaSession()
         super.onDestroy()
     }

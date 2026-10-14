@@ -3,8 +3,11 @@ package com.edgardev.mobile_app
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.database.ContentObserver
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioFormat
@@ -16,6 +19,8 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.KeyEvent
 import androidx.core.content.FileProvider
@@ -36,6 +41,13 @@ class MainActivity : FlutterActivity() {
     // Debounce de 140ms para evitar saltos dobles al girar la corona/rueda rápidamente
     private var lastActionTime = 0L
     private val THROTTLE_MS = 140L
+
+    // Control de volumen neutro (baseline) para capturar giro de corona / rueda sin saturar ni alterar volumen del teléfono
+    private var originalVolume = -1
+    private var baselineVolume = 7
+    private var volumeReceiver: BroadcastReceiver? = null
+    private var volumeObserver: ContentObserver? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -243,6 +255,7 @@ class MainActivity : FlutterActivity() {
 
             startSilentAudio()
             showForegroundNotification()
+            registerVolumeListeners()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -314,6 +327,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun stopMediaSession() {
+        unregisterVolumeListeners()
         stopSilentAudio()
         cancelNotification()
         try {
@@ -398,17 +412,123 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun registerVolumeListeners() {
+        if (volumeReceiver != null && volumeObserver != null) return
+
+        try {
+            val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            originalVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+            val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            baselineVolume = if (maxVol > 2) maxVol / 2 else 1
+
+            // Configurar volumen neutro sin emitir sonido ni mostrar interfaz
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, baselineVolume, 0)
+
+            // 1. BroadcastReceiver para android.media.VOLUME_CHANGED_ACTION
+            if (volumeReceiver == null) {
+                val receiver = object : BroadcastReceiver() {
+                    override fun onReceive(context: Context?, intent: Intent?) {
+                        if (intent?.action == "android.media.VOLUME_CHANGED_ACTION") {
+                            val streamType = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1)
+                            if (streamType == AudioManager.STREAM_MUSIC) {
+                                val newVol = intent.getIntExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", -1)
+                                if (newVol >= 0) {
+                                    handleVolumeChange(newVol)
+                                }
+                            }
+                        }
+                    }
+                }
+                volumeReceiver = receiver
+                val filter = IntentFilter("android.media.VOLUME_CHANGED_ACTION")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+                } else {
+                    registerReceiver(receiver, filter)
+                }
+            }
+
+            // 2. ContentObserver como respaldo para eventos del sistema
+            if (volumeObserver == null) {
+                val observer = object : ContentObserver(mainHandler) {
+                    override fun onChange(selfChange: Boolean) {
+                        super.onChange(selfChange)
+                        val curr = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                        handleVolumeChange(curr)
+                    }
+                }
+                volumeObserver = observer
+                contentResolver.registerContentObserver(
+                    Settings.System.CONTENT_URI,
+                    true,
+                    observer
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun unregisterVolumeListeners() {
+        try {
+            volumeReceiver?.let {
+                unregisterReceiver(it)
+                volumeReceiver = null
+            }
+        } catch (_: Exception) {}
+
+        try {
+            volumeObserver?.let {
+                contentResolver.unregisterContentObserver(it)
+                volumeObserver = null
+            }
+        } catch (_: Exception) {}
+
+        // Restaurar el volumen original del usuario
+        try {
+            if (originalVolume >= 0) {
+                val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, originalVolume, 0)
+                originalVolume = -1
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun handleVolumeChange(currentVolume: Int) {
+        if (currentVolume == baselineVolume) return
+
+        val diff = currentVolume - baselineVolume
+        if (diff > 0) {
+            // Corona giró horario / Subir volumen ➔ Siguiente
+            dispatchMediaAction("forward")
+        } else if (diff < 0) {
+            // Corona giró antihorario / Bajar volumen ➔ Anterior
+            dispatchMediaAction("back")
+        }
+
+        // Restablecer de inmediato al punto neutro sin UI ni sonido para evitar saturar el volumen
+        mainHandler.post {
+            try {
+                val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, baselineVolume, 0)
+            } catch (_: Exception) {}
+        }
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+                    dispatchMediaAction("forward")
+                } else {
+                    dispatchMediaAction("back")
+                }
+            }
+            return true // Consume tanto ACTION_DOWN como ACTION_UP para anular el cambio de volumen en el teléfono
+        }
+
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
-                KeyEvent.KEYCODE_VOLUME_UP -> {
-                    dispatchMediaAction("forward")
-                    return true
-                }
-                KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                    dispatchMediaAction("back")
-                    return true
-                }
                 KeyEvent.KEYCODE_MEDIA_NEXT,
                 KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
                     dispatchMediaAction("forward")
@@ -432,6 +552,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        unregisterVolumeListeners()
         stopMediaSession()
         super.onDestroy()
     }

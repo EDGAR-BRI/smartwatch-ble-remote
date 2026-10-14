@@ -3,22 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BT Presenter // Developer Portal</title>
+    <title>BT Presenter • Control de Presentaciones Universal</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <style>
         :root {
-            --bg: #070a11;
-            --card: #0b1120;
-            --border: #1e293b;
-            --accent: #00f0ff;
-            --accent-glow: rgba(0, 240, 255, 0.25);
+            --bg: #0f172a;
+            --card: #1e293b;
+            --border: #334155;
+            --primary: #38bdf8;
+            --primary-hover: #0284c7;
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
             --text: #f8fafc;
-            --muted: #64748b;
+            --text-muted: #94a3b8;
         }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
         body {
             background-color: var(--bg);
             color: var(--text);
@@ -26,14 +31,14 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 24px 16px;
+            padding: 32px 16px;
         }
         .container {
             width: 100%;
             max-width: 480px;
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 16px;
         }
         .header {
             text-align: center;
@@ -41,61 +46,50 @@
         }
         .logo-box {
             display: inline-block;
-            position: relative;
             margin-bottom: 12px;
         }
         .logo-img {
-            width: 72px;
-            height: 72px;
-            border-radius: 12px;
-            border: 1.5px solid var(--accent);
-            box-shadow: 0 0 24px var(--accent-glow);
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            box-shadow: 0 8px 24px rgba(56, 189, 248, 0.25);
             object-fit: cover;
-            background: #0e1526;
         }
         .header h1 {
-            font-size: 1.35rem;
+            font-size: 1.6rem;
             color: var(--text);
-            font-family: monospace;
-            font-weight: 900;
-            letter-spacing: 1.2px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
         }
-        .header h1 span { color: var(--accent); }
         .header p {
-            font-size: 0.8rem;
-            color: var(--muted);
-            margin-top: 4px;
-            font-family: monospace;
-            letter-spacing: 0.5px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            line-height: 1.4;
         }
         .card {
             background: var(--card);
-            border-radius: 6px;
-            padding: 16px;
+            border-radius: 16px;
+            padding: 20px;
             border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
         .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            font-family: monospace;
-            font-size: 0.8rem;
-            font-weight: bold;
-            color: var(--muted);
+            margin-bottom: 14px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
         }
-        .card-header .tag {
-            color: var(--accent);
+        .tag {
+            color: var(--success);
             font-size: 0.75rem;
-            background: rgba(0, 240, 255, 0.1);
-            padding: 2px 6px;
-            border-radius: 4px;
+            background: rgba(16, 185, 129, 0.15);
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-weight: 600;
         }
         .btn-download {
             display: flex;
@@ -103,30 +97,33 @@
             align-items: center;
             justify-content: center;
             width: 100%;
-            background: #0284c7;
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
             border: 1px solid #38bdf8;
             color: white;
             text-decoration: none;
             padding: 16px;
-            border-radius: 6px;
-            transition: all 0.15s ease;
-            box-shadow: 0 4px 20px rgba(2, 132, 199, 0.35);
+            border-radius: 12px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 16px rgba(2, 132, 199, 0.35);
         }
-        .btn-download:active { transform: scale(0.98); }
+        .btn-download:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
+        }
+        .btn-download:active {
+            transform: scale(0.98);
+        }
         .btn-download .title {
-            font-family: monospace;
-            font-size: 1rem;
-            font-weight: 800;
+            font-size: 1.05rem;
+            font-weight: 700;
             display: flex;
             align-items: center;
             gap: 8px;
         }
         .btn-download .subtitle {
-            font-family: monospace;
-            font-size: 0.75rem;
-            color: #e0f2fe;
+            font-size: 0.8rem;
+            color: #bae6fd;
             margin-top: 4px;
-            opacity: 0.9;
         }
         .btn-github {
             display: flex;
@@ -135,105 +132,74 @@
             gap: 6px;
             width: 100%;
             text-decoration: none;
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border);
-            color: #94a3b8;
+            color: var(--text-muted);
             padding: 10px;
-            border-radius: 6px;
-            font-family: monospace;
-            font-size: 0.78rem;
+            border-radius: 10px;
+            font-size: 0.82rem;
             font-weight: 600;
-            margin-top: 8px;
+            margin-top: 10px;
             transition: all 0.15s;
         }
         .btn-github:hover {
-            background: rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.08);
             color: var(--text);
         }
         /* Step by Step */
         .step-list {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
         .step-item {
             display: flex;
             align-items: flex-start;
-            gap: 12px;
-            background: rgba(255, 255, 255, 0.02);
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.04);
+            gap: 14px;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
         }
         .step-num {
-            background: rgba(0, 240, 255, 0.12);
-            color: var(--accent);
-            border: 1px solid rgba(0, 240, 255, 0.3);
-            font-family: monospace;
-            font-weight: bold;
-            font-size: 0.75rem;
-            padding: 4px 8px;
-            border-radius: 4px;
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--primary);
+            font-weight: 800;
+            font-size: 0.85rem;
+            padding: 4px 10px;
+            border-radius: 8px;
             flex-shrink: 0;
         }
         .step-content {
-            font-size: 0.82rem;
-            line-height: 1.4;
+            font-size: 0.85rem;
+            line-height: 1.45;
             color: #cbd5e1;
         }
         .step-content strong {
             color: white;
-            font-family: monospace;
-            font-size: 0.85rem;
             display: block;
             margin-bottom: 2px;
+            font-size: 0.9rem;
         }
-        /* HUD & Controls */
-        .hud-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-        .hud-node {
-            background: #070a11;
-            padding: 8px 10px;
-            border-radius: 6px;
-            border: 1px solid var(--border);
-            font-family: monospace;
-        }
-        .hud-node-label {
-            font-size: 0.7rem;
-            color: var(--muted);
-            text-transform: uppercase;
-        }
-        .hud-node-val {
-            font-size: 0.85rem;
-            font-weight: bold;
-            color: var(--success);
-            margin-top: 2px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
+        /* Remote Control Card */
         .flash-card {
-            background: #070a11;
-            border-radius: 6px;
-            padding: 14px 10px;
+            background: #0f172a;
+            border-radius: 12px;
+            padding: 16px;
             text-align: center;
             border: 1.5px solid var(--border);
-            transition: all 0.18s ease;
-            margin-bottom: 12px;
+            transition: all 0.2s ease;
+            margin-bottom: 14px;
         }
         .flash-card.active-forward {
-            background: rgba(16, 185, 129, 0.15);
-            border-color: var(--success);
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
+            background: rgba(56, 189, 248, 0.15);
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.25);
         }
         .flash-card.active-back {
-            background: rgba(0, 240, 255, 0.15);
-            border-color: var(--accent);
-            box-shadow: 0 0 20px var(--accent-glow);
+            background: rgba(244, 63, 94, 0.15);
+            border-color: #f43f5e;
+            box-shadow: 0 0 20px rgba(244, 63, 94, 0.25);
         }
         .flash-card.active-pause {
             background: rgba(168, 85, 247, 0.15);
@@ -241,138 +207,148 @@
             box-shadow: 0 0 20px rgba(168, 85, 247, 0.25);
         }
         .flash-text {
-            font-size: 1rem;
-            font-weight: 800;
-            font-family: monospace;
+            font-size: 1.05rem;
+            font-weight: 700;
             color: white;
         }
         .flash-sub {
-            font-size: 0.72rem;
-            color: var(--muted);
-            font-family: monospace;
-            margin-top: 3px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
         }
         .manual-controls {
             display: flex;
-            gap: 8px;
+            gap: 10px;
         }
         .btn-manual {
             flex: 1;
-            padding: 10px 6px;
-            background: #090d16;
+            padding: 12px 8px;
+            background: #0f172a;
             border: 1px solid var(--border);
             color: var(--text);
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 700;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
-            font-family: monospace;
-            transition: all 0.1s;
+            transition: all 0.15s;
         }
-        .btn-manual:active { background: rgba(255, 255, 255, 0.15); }
+        .btn-manual:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+        .btn-manual:active {
+            transform: scale(0.97);
+        }
+        .btn-manual.primary {
+            background: var(--primary-hover);
+            border-color: var(--primary);
+            color: white;
+            font-weight: 700;
+        }
         .log-box {
-            background: #050811;
-            border-radius: 6px;
-            padding: 8px;
-            font-family: monospace;
-            font-size: 0.72rem;
-            color: #64748b;
+            background: #0b0f19;
+            border-radius: 10px;
+            padding: 10px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
             height: 90px;
             overflow-y: auto;
             border: 1px solid var(--border);
+            margin-top: 12px;
+            display: none;
+        }
+        .toggle-logs {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            cursor: pointer;
+            text-align: center;
+            width: 100%;
             margin-top: 10px;
+        }
+        .toggle-logs:hover {
+            color: var(--text);
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Encabezado con Mascota -->
+        <!-- Encabezado Amigable con Mascota -->
         <div class="header">
             <div class="logo-box">
                 <img src="/static/img/logo.png" alt="BT Presenter" class="logo-img">
             </div>
-            <h1>BT <span>// PRESENTER</span></h1>
-            <p>PORTAL DE DESCARGA & PUENTE LINUX uinput</p>
+            <h1>BT Presenter</h1>
+            <p>Control de presentaciones universal para tus auriculares Bluetooth, Smartwatch y teléfono móvil.</p>
         </div>
 
         <!-- Tarjeta Principal: Descarga del APK -->
         <div class="card">
             <div class="card-header">
-                <span>📦 BINARIO ANDROID OFICIAL</span>
-                <span id="apkVersionPill" class="tag">CARGANDO...</span>
+                <span>APLICACIÓN OFICIAL ANDROID</span>
+                <span id="apkVersionPill" class="tag">DISPONIBLE</span>
             </div>
             <a id="btnDownloadApk" href="/BTPresenter.apk" download class="btn-download">
-                <span class="title">📥 DESCARGAR BT PRESENTER (APK)</span>
-                <span id="apkDetails" class="subtitle">BTPresenter.apk</span>
+                <span class="title">📥 Descargar para Android (APK)</span>
+                <span id="apkDetails" class="subtitle">BTPresenter.apk • Seguro y directo</span>
             </a>
             <a id="btnGithubRelease" href="https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest" target="_blank" class="btn-github">
-                <span>🐙 [ GITHUB RELEASES // CÓDIGO & VERSIONES ]</span>
+                <span>Ver en GitHub Releases & Código Fuente</span>
             </a>
         </div>
 
         <!-- Tarjeta Guía Rápida: 3 Pasos Simples -->
         <div class="card">
             <div class="card-header">
-                <span>⚡ GUÍA DE INICIO RÁPIDO</span>
-                <span class="tag">3 PASOS</span>
+                <span>¿CÓMO FUNCIONA?</span>
+                <span class="tag" style="color: var(--primary); background: rgba(56, 189, 248, 0.15);">3 PASOS</span>
             </div>
             <div class="step-list">
                 <div class="step-item">
                     <span class="step-num">01</span>
                     <div class="step-content">
-                        <strong>INSTALA EL APK EN TU CELULAR</strong>
-                        Descarga el archivo APK pulsando el botón superior e instálalo (autoriza instalar apps desconocidas si el navegador lo solicita).
+                        <strong>Descarga e instala la app en tu teléfono</strong>
+                        Pulsa el botón de descarga superior e instala el archivo en tu teléfono Android.
                     </div>
                 </div>
                 <div class="step-item">
                     <span class="step-num">02</span>
                     <div class="step-content">
-                        <strong>ABRE LA APP Y DETECTA TU LAPTOP</strong>
-                        Al estar en el mismo Wi-Fi, la app detectará esta laptop automáticamente por UDP en el puerto <code style="color: var(--accent); font-family: monospace;">8888</code>.
+                        <strong>Abre la app en el mismo Wi-Fi</strong>
+                        Al estar en la misma red Wi-Fi que tu laptop, la app la detectará automáticamente.
                     </div>
                 </div>
                 <div class="step-item">
                     <span class="step-num">03</span>
                     <div class="step-content">
-                        <strong>ENLAZA TU CONTROL Y PRESENTA</strong>
-                        Abre tu presentación en Canva, PowerPoint o PDF. Pasa diapositivas con Smartwatch, Auriculares Bluetooth (toque de música) o disparadores BLE.
+                        <strong>Presenta sin tocar la laptop</strong>
+                        Abre Canva, PowerPoint o PDF. Pasa tus diapositivas tocando tus auriculares, girando tu reloj o con los botones en pantalla.
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Tarjeta de Estado del Servidor & Clicker de Prueba -->
+        <!-- Tarjeta de Control Remoto & Prueba -->
         <div class="card">
             <div class="card-header">
-                <span>🎛️ SERVIDOR LINUX & TEST CLICKER</span>
-                <span id="wsStatusBadge" class="tag" style="color: var(--danger); background: rgba(239, 68, 68, 0.1);">OFFLINE</span>
-            </div>
-            
-            <div class="hud-grid">
-                <div class="hud-node">
-                    <div class="hud-node-label">INYECTOR LINUX</div>
-                    <div class="hud-node-val">✓ /dev/uinput</div>
-                </div>
-                <div class="hud-node">
-                    <div class="hud-node-label">PUERTO LOCAL</div>
-                    <div class="hud-node-val" style="color: var(--accent);">:8888 (HTTPS)</div>
-                </div>
+                <span>PROBADOR DE CONTROL REMOTO</span>
+                <span id="wsStatusBadge" class="tag">LISTO</span>
             </div>
 
-            <!-- Visualizador de Tecla Inyectada -->
+            <!-- Visualizador de Acción -->
             <div id="flashCard" class="flash-card">
-                <div id="flashText" class="flash-text">LISTO PARA DIAPOSITIVAS</div>
-                <div id="flashSub" class="flash-sub">ESCUCHANDO EVENTOS WEBSOCKET...</div>
+                <div id="flashText" class="flash-text">Listo para tu presentación</div>
+                <div id="flashSub" class="flash-sub">Esperando toques desde auriculares, reloj o botones...</div>
             </div>
 
-            <!-- Botones Mecánicos de Prueba -->
+            <!-- Botones de Control Remoto -->
             <div class="manual-controls">
-                <button id="btnManualBack" class="btn-manual">[ ◀ KEY_LEFT ]</button>
-                <button id="btnManualPause" class="btn-manual" style="border-color: #a855f7; color: #d8b4fe;">[ ⏸ KEY_U ]</button>
-                <button id="btnManualNext" class="btn-manual" style="border-color: var(--accent); color: var(--accent);">[ KEY_RIGHT ▶ ]</button>
+                <button id="btnManualBack" class="btn-manual">◀ Anterior</button>
+                <button id="btnManualPause" class="btn-manual" style="border-color: #a855f7; color: #d8b4fe;">⏸️ Telón</button>
+                <button id="btnManualNext" class="btn-manual primary">Siguiente ▶</button>
             </div>
 
-            <!-- Log de Consola -->
+            <button id="btnToggleLogs" class="toggle-logs" onclick="toggleLogs()">Ver detalles de conexión</button>
             <div id="logBox" class="log-box"></div>
         </div>
     </div>
@@ -385,8 +361,19 @@
         const logBox = document.getElementById('logBox');
         const apkVersionPill = document.getElementById('apkVersionPill');
         const apkDetails = document.getElementById('apkDetails');
+        const btnToggleLogs = document.getElementById('btnToggleLogs');
 
         let ws = null;
+
+        function toggleLogs() {
+            if (logBox.style.display === "block") {
+                logBox.style.display = "none";
+                btnToggleLogs.innerText = "Ver detalles de conexión";
+            } else {
+                logBox.style.display = "block";
+                btnToggleLogs.innerText = "Ocultar detalles de conexión";
+            }
+        }
 
         function log(msg) {
             const time = new Date().toLocaleTimeString();
@@ -395,7 +382,7 @@
 
         function triggerFlash(action, label, sub) {
             flashText.innerText = label;
-            flashSub.innerText = sub || "INYECTADO EN /dev/uinput";
+            flashSub.innerText = sub || "Disparo recibido con éxito";
             flashCard.className = `flash-card active-${action}`;
             setTimeout(() => {
                 flashCard.className = 'flash-card';
@@ -408,14 +395,10 @@
             .then(data => {
                 if (data.version) {
                     apkVersionPill.innerText = `v${data.version}`;
-                    apkVersionPill.style.color = "var(--success)";
-                    apkVersionPill.style.background = "rgba(16, 185, 129, 0.15)";
                     apkDetails.innerText = `Versión v${data.version} • ${data.size_mb} • Android 8.0+`;
                 }
             })
-            .catch(() => {
-                apkVersionPill.innerText = "ONLINE";
-            });
+            .catch(() => {});
 
         // Conectar WebSocket a la laptop
         function connectWs() {
@@ -424,10 +407,10 @@
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                wsStatusBadge.innerText = "ONLINE";
+                wsStatusBadge.innerText = "CONECTADO";
                 wsStatusBadge.style.color = "var(--success)";
                 wsStatusBadge.style.background = "rgba(16, 185, 129, 0.15)";
-                log("✓ Conectado a la laptop vía WebSocket");
+                log("Conectado con la laptop.");
             };
 
             ws.onclose = () => {
@@ -445,14 +428,14 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.action === "forward") {
-                        triggerFlash("forward", "⏩ KEY_RIGHT (ADELANTE)", "DISPARO DESDE RELOJ, AURICULARES O BLE");
-                        log("⏩ Evento: Avanzar (KEY_RIGHT)");
+                        triggerFlash("forward", "⏩ Siguiente Diapositiva", "Paso de diapositiva activado");
+                        log("Avanzar diapositiva");
                     } else if (data.action === "back") {
-                        triggerFlash("back", "⏪ KEY_LEFT (ATRÁS)", "DOBLE TOQUE O BOTÓN ATRÁS");
-                        log("⏪ Evento: Retroceder (KEY_LEFT)");
+                        triggerFlash("back", "⏪ Diapositiva Anterior", "Retroceso de diapositiva activado");
+                        log("Retroceder diapositiva");
                     } else if (data.action === "play_pause") {
-                        triggerFlash("pause", "⏯️ KEY_U (TELÓN/PAUSA)", "TELÓN CANVA O PAUSA MULTIMEDIA");
-                        log("⏯️ Evento: Telón / Pausa (KEY_U)");
+                        triggerFlash("pause", "⏸️ Telón Negro (Pausa)", "Pantalla pausada");
+                        log("Telón / Pausa activada");
                     }
                 } catch (e) {}
             };
@@ -460,24 +443,26 @@
 
         connectWs();
 
-        // Botones de Prueba Manual
-        document.getElementById('btnManualBack').onclick = () => {
+        document.getElementById('btnManualNext').addEventListener('click', () => {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ event: "back" }));
+                ws.send(JSON.stringify({ event: 'forward', timestamp: Date.now() }));
+                triggerFlash('forward', '⏩ Siguiente Diapositiva', 'Pulsado en la página web');
             }
-        };
+        });
 
-        document.getElementById('btnManualPause').onclick = () => {
+        document.getElementById('btnManualBack').addEventListener('click', () => {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ event: "play_pause" }));
+                ws.send(JSON.stringify({ event: 'back', timestamp: Date.now() }));
+                triggerFlash('back', '⏪ Diapositiva Anterior', 'Pulsado en la página web');
             }
-        };
+        });
 
-        document.getElementById('btnManualNext').onclick = () => {
+        document.getElementById('btnManualPause').addEventListener('click', () => {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ event: "forward" }));
+                ws.send(JSON.stringify({ event: 'play_pause', timestamp: Date.now() }));
+                triggerFlash('pause', '⏸️ Telón Negro (Pausa)', 'Pulsado en la página web');
             }
-        };
+        });
     </script>
 </body>
 </html>

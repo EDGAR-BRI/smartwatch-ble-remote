@@ -71,6 +71,11 @@ def get_local_ip():
         return '127.0.0.1'
 
 
+GITHUB_REPO = "EDGAR-BRI/smartwatch-ble-remote"
+GITHUB_LATEST_RELEASE_APK_URL = f"https://github.com/{GITHUB_REPO}/releases/latest/download/SmartwatchPresenter.apk"
+GITHUB_LATEST_RELEASE_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
+
+
 def get_app_version_info():
     base_dir = os.path.dirname(__file__)
     pubspec_path = os.path.join(base_dir, "mobile_app", "pubspec.yaml")
@@ -124,6 +129,8 @@ def get_app_version_info():
         "build_time": build_time,
         "mtime": mtime,
         "filename": f"SmartwatchPresenter-v{version_name}.apk",
+        "github_apk_url": GITHUB_LATEST_RELEASE_APK_URL,
+        "github_release_url": GITHUB_LATEST_RELEASE_PAGE,
     }
 
 
@@ -238,7 +245,8 @@ class BridgeServer:
                 "Pragma": "no-cache",
                 "Expires": "0",
             })
-        return web.Response(text="APK no encontrado", status=404)
+        # Si la laptop no tiene el APK compilado localmente, redirige automáticamente a GitHub Releases
+        raise web.HTTPFound(GITHUB_LATEST_RELEASE_APK_URL)
 
 
 class DiscoveryProtocol(asyncio.DatagramProtocol):
@@ -333,6 +341,7 @@ async def main():
     print("=" * 70)
     print(f"  📦 Versión App Android: v{info['version']} ({info['size_mb']})")
     print(f"  🕒 Compilación: {info['build_time']}")
+    print(f"  🐙 GitHub Releases: {GITHUB_LATEST_RELEASE_APK_URL}")
     print(f"  🌐 IP detectada en tu red actual: {local_ip}")
     print("-" * 70)
     print("Elige cualquiera de las dos formas de abrirlo en tu celular:")

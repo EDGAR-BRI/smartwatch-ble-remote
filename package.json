@@ -1,6 +1,6 @@
 {
   "name": "smartwatch-remote-presenter",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Control de diapositivas en Linux con Smartwatch vía BLE, AVRCP y uinput",
   "main": "web_bridge.py",
   "scripts": {
@@ -15,6 +15,7 @@
     "sniffer": "./venv/bin/python sniffer.py",
     "clicker": "./venv/bin/python remote_clicker.py",
     "build:apk": "cd mobile_app && flutter build apk --release",
+    "download:apk": "mkdir -p mobile_app/build/app/outputs/flutter-apk && curl -L -o mobile_app/build/app/outputs/flutter-apk/app-release.apk https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/SmartwatchPresenter.apk",
     "analyze:app": "cd mobile_app && flutter analyze"
   },
   "keywords": [

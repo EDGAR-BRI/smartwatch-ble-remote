@@ -21,6 +21,9 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.os.VibrationEffect
 import android.provider.Settings
 import android.view.KeyEvent
 import androidx.core.content.FileProvider
@@ -116,6 +119,14 @@ class MainActivity : FlutterActivity() {
                     } else {
                         result.error("INVALID_ARG", "filePath es requerido", null)
                     }
+                }
+                "vibrate" -> {
+                    val pattern = call.argument<String>("pattern") ?: "forward"
+                    triggerNativeVibration(pattern)
+                    result.success(true)
+                }
+                "hasVibrator" -> {
+                    result.success(checkHasVibrator())
                 }
                 else -> result.notImplemented()
             }
@@ -549,6 +560,50 @@ class MainActivity : FlutterActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    private fun getVibrator(): Vibrator? {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator ?: (getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
+            } else {
+                @Suppress("DEPRECATION")
+                getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun checkHasVibrator(): Boolean {
+        val v = getVibrator()
+        return v?.hasVibrator() == true
+    }
+
+    private fun triggerNativeVibration(pattern: String) {
+        try {
+            val vibrator = getVibrator() ?: return
+            if (!vibrator.hasVibrator()) return
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val effect = when (pattern) {
+                    "forward" -> VibrationEffect.createOneShot(100L, VibrationEffect.DEFAULT_AMPLITUDE)
+                    "back" -> VibrationEffect.createWaveform(longArrayOf(0L, 70L, 90L, 70L), -1)
+                    "play_pause" -> VibrationEffect.createOneShot(240L, VibrationEffect.DEFAULT_AMPLITUDE)
+                    else -> VibrationEffect.createOneShot(80L, VibrationEffect.DEFAULT_AMPLITUDE)
+                }
+                vibrator.vibrate(effect)
+            } else {
+                @Suppress("DEPRECATION")
+                when (pattern) {
+                    "forward" -> vibrator.vibrate(100L)
+                    "back" -> vibrator.vibrate(longArrayOf(0L, 70L, 90L, 70L), -1)
+                    "play_pause" -> vibrator.vibrate(240L)
+                    else -> vibrator.vibrate(80L)
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     override fun onDestroy() {

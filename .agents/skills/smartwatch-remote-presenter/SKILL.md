@@ -120,29 +120,39 @@ Para evitar que Android cierre la aplicación cuando el usuario bloquea el telé
 
 ---
 
-## 5. Actualizador In-App (OTA) de APK y Limpieza de Caché
+## 5. Actualizador In-App (OTA) de APK, GitHub Releases y Limpieza de Caché
 
 Permite actualizar la app móvil sin necesidad de ingresar al navegador web:
-1. **Servidor:** Expone `GET /api/app-info` (obtiene versión de `pubspec.yaml`, tamaño y timestamp del APK compilado) y `GET /app.apk`.
-2. **Cliente Flutter:**
+1. **Enlace Permanente en GitHub Releases:**
+   - URL fija: `https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/SmartwatchPresenter.apk`
+   - Al publicar una nueva versión con tag `vX.X.X`, GitHub redirige automáticamente el endpoint `releases/latest/download` al binario más reciente, eliminando la necesidad de actualizar enlaces hardcodeados en el código.
+2. **Servidor Puente (`web_bridge.py`):**
+   - Expone `GET /api/app-info` y `GET /app.apk`.
+   - **Fallback Inteligente:** Si la laptop no tiene Flutter instalado y no existe el APK compilado localmente, `GET /app.apk` emite una redirección HTTP 302 hacia el enlace permanente de GitHub Releases.
+3. **Cliente Flutter:**
    - Comprueba versión al conectar por WebSocket y mediante botón de búsqueda en el AppBar.
-   - Si hay actualización: descarga el archivo usando `HttpClient` directamente al `cacheDir`.
-   - Diálogo de progreso en MB y porcentaje.
+   - Si hay actualización: descarga el archivo usando `HttpClient` directamente al `cacheDir` (con fallback automático a GitHub Releases si la PC local no lo tiene).
+   - Diálogo de progreso en MB, porcentaje y origen del binario (Wi-Fi local o GitHub).
    - **Limpieza de Caché:** Al iniciar la app tras la actualización, si existe un archivo `update.apk` en caché (aprox. 50 MB), se elimina automáticamente para no malgastar espacio en disco.
-3. **Instalación Segura en Android (FileProvider):**
+4. **Instalación Segura en Android (FileProvider):**
    - Requiere `REQUEST_INSTALL_PACKAGES` en el Manifest.
    - `<paths>` en `res/xml/file_paths.xml` con `<cache-path name="cache" path="." />`.
    - Inicia `Intent.ACTION_VIEW` con `setDataAndType(apkUri, "application/vnd.android.package-archive")` y `FLAG_GRANT_READ_URI_PERMISSION`.
 
 ---
 
-## 6. Feedback Háptico para el Bolsillo
+## 6. Feedback Háptico para el Bolsillo (Motor Nativo Vibrator)
 
 Para que el orador tenga confirmación táctil con el teléfono en el bolsillo sin mirar la pantalla de proyección:
-- **Avanzar Diapositiva (⏩):** 1 pulso de vibración medio (`HapticFeedback.mediumImpact()`).
-- **Retroceder Diapositiva (⏪):** 2 pulsos consecutivos separados por 110 ms.
-- **Play / Pausa (⏯️):** 1 pulso pesado prolongado (`HapticFeedback.heavyImpact()`).
-- **Configurable:** Interruptor en la interfaz móvil para activar o silenciar las vibraciones según la preferencia del usuario.
+- **Motor de Hardware Nativo (`android.os.Vibrator`):**
+  - Utiliza el servicio nativo de Android mediante MethodChannel (`vibrate`).
+  - Garantiza funcionamiento con la **pantalla apagada y el móvil en el bolsillo**, independientemente de si la opción "vibrar al pulsar" del sistema está apagada.
+  - Requiere el permiso `android.permission.VIBRATE` (permiso normal de sistema).
+- **Patrones Diferenciados:**
+  - **Avanzar Diapositiva (⏩):** 1 pulso de 100 ms.
+  - **Retroceder Diapositiva (⏪):** 2 pulsos consecutivos (70 ms vibración, 90 ms pausa, 70 ms vibración).
+  - **Play / Pausa (⏯️) / Tecla U:** 1 pulso pesado prolongado (240 ms).
+- **Configurable:** Interruptor en la interfaz móvil para activar o silenciar las vibraciones con vibración de prueba inmediata al encenderlo.
 
 ---
 

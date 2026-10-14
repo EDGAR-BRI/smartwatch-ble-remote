@@ -139,6 +139,22 @@ else
     echo -e "${YELLOW}Si al ejecutar el puente da error, corre: sudo chmod 666 /dev/uinput${NC}"
 fi
 
+# 7. Descargar APK más reciente desde GitHub Releases (si no está compilado localmente)
+echo -e "\n${BOLD}[*] Verificando instalador Android (APK)...${NC}"
+APK_TARGET_DIR="mobile_app/build/app/outputs/flutter-apk"
+APK_TARGET_FILE="$APK_TARGET_DIR/app-release.apk"
+if [ ! -f "$APK_TARGET_FILE" ]; then
+    echo -e "Descargando la última versión del APK desde GitHub Releases..."
+    mkdir -p "$APK_TARGET_DIR"
+    if curl -L -s -f -o "$APK_TARGET_FILE" "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/SmartwatchPresenter.apk"; then
+        echo -e "${GREEN}✓ APK descargado exitosamente para que tu laptop lo sirva a tu teléfono.${NC}"
+    else
+        echo -e "${YELLOW}Aviso: No se pudo descargar el APK en este momento. La laptop redirigirá al enlace de GitHub si el teléfono lo solicita.${NC}"
+    fi
+else
+    echo -e "${GREEN}✓ APK disponible en la laptop.${NC}"
+fi
+
 # Obtener IP local de la laptop
 LOCAL_IP=$(./venv/bin/python -c '
 import socket

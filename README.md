@@ -1,5 +1,8 @@
 # ⌚ Smartwatch BLE Remote Presenter
 
+[![Descargar Último APK](https://img.shields.io/badge/Descargar-Último%20APK%20(Release)-0284c7?style=for-the-badge&logo=android)](https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/SmartwatchPresenter.apk)
+[![GitHub Release](https://img.shields.io/github/v/release/EDGAR-BRI/smartwatch-ble-remote?style=for-the-badge&color=22c55e)](https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest)
+
 Control remoto de presentaciones (Canva, Google Slides, LibreOffice, PDF) utilizando un reloj inteligente genérico (**Laxasfit / HryFine / Chipset JieLi AC69xx/AC70xx**) mediante **Bluetooth Low Energy (BLE)** en **Linux (Wayland y X11)**.
 
 ---
@@ -56,6 +59,7 @@ cd smartwatch-ble-remote
 | `npm run stop` | Detiene el servidor en segundo plano si quedó abierto |
 | `npm run setup` | Ejecuta el script de onboarding/permisos en tu laptop |
 | `npm run build:apk` | Compila un nuevo APK de release en Flutter |
+| `npm run download:apk` | Descarga el último APK desde GitHub Releases a la laptop |
 | `npm run scanner` | Escanea y detecta la MAC de tu smartwatch BLE |
 
 ---

@@ -23,7 +23,9 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.8+9";
+const String appVersion = "1.0.9+10";
+const String githubLatestApkUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/SmartwatchPresenter.apk";
+const String githubLatestReleaseUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
 const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media_session');
 
@@ -219,6 +221,13 @@ class _PresenterScreenState extends State<PresenterScreen> {
         _log("[!] Faltan permisos de Dispositivos Cercanos o Ubicación");
       }
 
+      try {
+        final hasVibe = await _mediaChannel.invokeMethod<bool>('hasVibrator') ?? false;
+        if (hasVibe) {
+          _log("✓ Permiso y motor de vibración táctil: Activo");
+        }
+      } catch (_) {}
+
       if (_batteryOptIgnored) {
         _log("✓ Segundo plano sin restricciones de batería");
       } else {
@@ -284,20 +293,8 @@ class _PresenterScreenState extends State<PresenterScreen> {
       final serverVersion = data['version']?.toString() ?? "";
       final sizeMb = data['size_mb']?.toString() ?? "";
       final apkExists = data['apk_exists'] == true;
+      final source = apkExists ? "PC Local (Wi-Fi)" : "GitHub Releases";
       final buildTime = data['build_time']?.toString() ?? "";
-
-      if (!apkExists) {
-        if (manual && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("No se encontró ningún APK compilado en el servidor."),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        _isCheckingUpdate = false;
-        return;
-      }
 
       final hasUpdate = serverVersion.isNotEmpty && serverVersion != appVersion;
 
@@ -357,7 +354,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                 const SizedBox(height: 4),
                 Text("Nueva versión: v$serverVersion", style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 4),
-                Text("Tamaño: $sizeMb  •  Fecha: $buildTime", style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                Text("Tamaño: $sizeMb  •  $source ($buildTime)", style: const TextStyle(color: Colors.white54, fontSize: 12)),
                 const SizedBox(height: 12),
                 const Text("¿Deseas descargar e instalar esta versión directamente?"),
               ],
@@ -488,11 +485,20 @@ class _PresenterScreenState extends State<PresenterScreen> {
       }
 
       final client = HttpClient()..badCertificateCallback = ((c, h, p) => true);
-      final request = await client.getUrl(_getPcHttpUri('/app.apk'));
-      final response = await request.close();
-
-      if (response.statusCode != 200) {
-        throw Exception("Error del servidor: HTTP ${response.statusCode}");
+      HttpClientResponse response;
+      try {
+        final request = await client.getUrl(_getPcHttpUri('/app.apk'));
+        response = await request.close();
+        if (response.statusCode != 200) {
+          throw Exception("HTTP ${response.statusCode}");
+        }
+      } catch (pcErr) {
+        _log("[!] Descargando APK desde GitHub Releases...");
+        final request = await client.getUrl(Uri.parse(githubLatestApkUrl));
+        response = await request.close();
+        if (response.statusCode != 200) {
+          throw Exception("Error descargando desde GitHub: HTTP ${response.statusCode}");
+        }
       }
 
       final totalBytes = response.contentLength;
@@ -555,6 +561,10 @@ class _PresenterScreenState extends State<PresenterScreen> {
   void _triggerHaptic(String action) {
     if (!_hapticEnabled) return;
     try {
+      // 1. Motor de vibración de hardware nativo Android (funciona con pantalla apagada en el bolsillo)
+      _mediaChannel.invokeMethod('vibrate', {'pattern': action});
+
+      // 2. Feedback táctil de la interfaz Flutter
       if (action == "forward") {
         HapticFeedback.mediumImpact();
       } else if (action == "back") {
@@ -1272,7 +1282,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     activeTrackColor: const Color(0xFF38BDF8),
                     onChanged: (val) {
                       setState(() => _hapticEnabled = val);
-                      if (val) HapticFeedback.mediumImpact();
+                      if (val) _triggerHaptic("forward");
                     },
                   ),
                 ],

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smartwatch Presenter Bridge</title>
+    <title>Smartwatch Presenter // Developer Portal</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <style>
         :root {
@@ -13,6 +13,7 @@
             --accent: #00f0ff;
             --accent-glow: rgba(0, 240, 255, 0.25);
             --success: #10b981;
+            --warning: #f59e0b;
             --danger: #ef4444;
             --text: #f8fafc;
             --muted: #64748b;
@@ -25,89 +26,204 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 20px;
+            padding: 24px 16px;
+        }
+        .container {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
         }
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
+        }
+        .logo-box {
+            display: inline-block;
+            position: relative;
+            margin-bottom: 12px;
+        }
+        .logo-img {
+            width: 72px;
+            height: 72px;
+            border-radius: 12px;
+            border: 1.5px solid var(--accent);
+            box-shadow: 0 0 24px var(--accent-glow);
+            object-fit: cover;
+            background: #0e1526;
         }
         .header h1 {
             font-size: 1.35rem;
-            color: var(--accent);
+            color: var(--text);
+            font-family: monospace;
+            font-weight: 900;
+            letter-spacing: 1.2px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            font-family: monospace;
-            font-weight: 800;
-            letter-spacing: 1px;
+            gap: 6px;
         }
+        .header h1 span { color: var(--accent); }
         .header p {
             font-size: 0.8rem;
             color: var(--muted);
             margin-top: 4px;
             font-family: monospace;
+            letter-spacing: 0.5px;
         }
         .card {
             background: var(--card);
             border-radius: 6px;
             padding: 16px;
-            width: 100%;
-            max-width: 420px;
-            margin-bottom: 14px;
             border: 1px solid var(--border);
         }
-        .status-row {
+        .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-            font-size: 0.88rem;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             font-family: monospace;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: var(--muted);
         }
-        .status-row:last-child { border-bottom: none; }
-        .badge {
-            padding: 3px 8px;
-            border-radius: 4px;
+        .card-header .tag {
+            color: var(--accent);
             font-size: 0.75rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-family: monospace;
+            background: rgba(0, 240, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
         }
-        .badge-online { background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); }
-        .badge-offline { background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3); }
-        .btn-connect {
+        .btn-download {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             width: 100%;
             background: #0284c7;
-            color: white;
             border: 1px solid #38bdf8;
-            padding: 14px;
+            color: white;
+            text-decoration: none;
+            padding: 16px;
             border-radius: 6px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: transform 0.1s, opacity 0.2s;
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 20px rgba(2, 132, 199, 0.35);
+        }
+        .btn-download:active { transform: scale(0.98); }
+        .btn-download .title {
+            font-family: monospace;
+            font-size: 1rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-download .subtitle {
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #e0f2fe;
+            margin-top: 4px;
+            opacity: 0.9;
+        }
+        .btn-github {
             display: flex;
             align-items: center;
             justify-content: center;
+            gap: 6px;
+            width: 100%;
+            text-decoration: none;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            color: #94a3b8;
+            padding: 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.78rem;
+            font-weight: 600;
+            margin-top: 8px;
+            transition: all 0.15s;
+        }
+        .btn-github:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text);
+        }
+        /* Step by Step */
+        .step-list {
+            display: flex;
+            flex-direction: column;
             gap: 10px;
-            margin-top: 10px;
+        }
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .step-num {
+            background: rgba(0, 240, 255, 0.12);
+            color: var(--accent);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+        .step-content {
+            font-size: 0.82rem;
+            line-height: 1.4;
+            color: #cbd5e1;
+        }
+        .step-content strong {
+            color: white;
+            font-family: monospace;
+            font-size: 0.85rem;
+            display: block;
+            margin-bottom: 2px;
+        }
+        /* HUD & Controls */
+        .hud-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .hud-node {
+            background: #070a11;
+            padding: 8px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
             font-family: monospace;
         }
-        .btn-connect:active { transform: scale(0.98); }
-        .btn-connect:disabled { opacity: 0.5; cursor: not-allowed; }
+        .hud-node-label {
+            font-size: 0.7rem;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+        .hud-node-val {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--success);
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
         .flash-card {
-            background: var(--card);
+            background: #070a11;
             border-radius: 6px;
-            padding: 24px 16px;
-            width: 100%;
-            max-width: 420px;
+            padding: 14px 10px;
             text-align: center;
-            border: 1px solid var(--border);
+            border: 1.5px solid var(--border);
             transition: all 0.18s ease;
+            margin-bottom: 12px;
         }
         .flash-card.active-forward {
             background: rgba(16, 185, 129, 0.15);
@@ -124,340 +240,244 @@
             border-color: #a855f7;
             box-shadow: 0 0 20px rgba(168, 85, 247, 0.25);
         }
-        .flash-icon {
-            font-size: 2.5rem;
-            margin-bottom: 6px;
-        }
         .flash-text {
-            font-size: 1.15rem;
-            font-weight: bold;
+            font-size: 1rem;
+            font-weight: 800;
             font-family: monospace;
+            color: white;
+        }
+        .flash-sub {
+            font-size: 0.72rem;
+            color: var(--muted);
+            font-family: monospace;
+            margin-top: 3px;
         }
         .manual-controls {
             display: flex;
             gap: 8px;
-            width: 100%;
-            max-width: 420px;
-            margin-top: 12px;
         }
         .btn-manual {
             flex: 1;
-            padding: 12px;
+            padding: 10px 6px;
             background: #090d16;
             border: 1px solid var(--border);
             color: var(--text);
             border-radius: 6px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 700;
             cursor: pointer;
             font-family: monospace;
+            transition: all 0.1s;
         }
-        .btn-manual:active { background: rgba(255,255,255,0.12); }
+        .btn-manual:active { background: rgba(255, 255, 255, 0.15); }
         .log-box {
-            width: 100%;
-            max-width: 420px;
             background: #050811;
             border-radius: 6px;
-            padding: 10px;
+            padding: 8px;
             font-family: monospace;
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             color: #64748b;
-            height: 120px;
+            height: 90px;
             overflow-y: auto;
-            margin-top: 12px;
             border: 1px solid var(--border);
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <div style="display: flex; justify-content: center; margin-bottom: 12px;">
-            <img src="/static/img/logo.png" alt="Smartwatch Presenter Logo" style="width: 76px; height: 76px; border-radius: 18px; box-shadow: 0 8px 24px rgba(56, 189, 248, 0.35); border: 1.5px solid rgba(56, 189, 248, 0.4); object-fit: cover;">
+    <div class="container">
+        <!-- Encabezado con Mascota -->
+        <div class="header">
+            <div class="logo-box">
+                <img src="/static/img/logo.png" alt="Smartwatch Presenter" class="logo-img">
+            </div>
+            <h1>SMARTWATCH <span>// PRESENTER</span></h1>
+            <p>PORTAL DE DESCARGA & PUENTE LINUX uinput</p>
         </div>
-        <h1>Smartwatch Remote Bridge</h1>
-        <p>Puente Web Bluetooth ➔ PC Linux</p>
-    </div>
 
-    <div class="card">
-        <div class="status-row">
-            <span>Enlace con PC:</span>
-            <span id="wsStatus" class="badge badge-offline">🔴 Desconectado</span>
-        </div>
-        <div class="status-row">
-            <span>Reloj Bluetooth:</span>
-            <span id="bleStatus" class="badge badge-offline">⚪ Sin conectar</span>
-        </div>
-        <div class="status-row">
-            <span>Batería reloj:</span>
-            <span id="batteryStatus" style="color: var(--muted); font-weight: bold;">--%</span>
-        </div>
-        <div style="margin-top: 16px;">
-            <button id="btnConnect" class="btn-connect">
-                <span>🔗 Conectar Smartwatch</span>
-            </button>
-            <a href="/app.apk" download style="display: block; text-decoration: none; text-align: center; margin-top: 12px; padding: 12px; background: rgba(0, 240, 255, 0.08); color: var(--accent); border-radius: 6px; font-weight: 600; border: 1px solid rgba(0, 240, 255, 0.35); font-size: 0.9rem; font-family: monospace;">
-                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                    <span>📥 DESCARGAR APP ANDROID (APK)</span>
-                    <span id="apkVersionTag" style="background: rgba(0, 240, 255, 0.2); color: #00f0ff; font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-weight: bold;">v1.0.11+12</span>
-                </div>
-                <div id="apkMetaDetails" style="font-size: 0.72rem; color: #64748b; font-weight: normal; margin-top: 4px;">
-                    Cargando estado del APK...
-                </div>
+        <!-- Tarjeta Principal: Descarga del APK -->
+        <div class="card">
+            <div class="card-header">
+                <span>📦 BINARIO ANDROID OFICIAL</span>
+                <span id="apkVersionPill" class="tag">CARGANDO...</span>
+            </div>
+            <a id="btnDownloadApk" href="/app.apk" download class="btn-download">
+                <span class="title">📥 DESCARGAR APK ANDROID</span>
+                <span id="apkDetails" class="subtitle">SmartwatchPresenter.apk</span>
             </a>
-            <a id="btnGithubRelease" href="https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest" target="_blank" style="display: flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; text-align: center; margin-top: 8px; padding: 8px; background: rgba(255, 255, 255, 0.03); color: #94a3b8; border-radius: 6px; font-weight: 500; border: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.78rem; font-family: monospace;">
-                <span>🐙 [ GITHUB RELEASES // LATEST ]</span>
+            <a id="btnGithubRelease" href="https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest" target="_blank" class="btn-github">
+                <span>🐙 [ GITHUB RELEASES // CÓDIGO & VERSIONES ]</span>
             </a>
         </div>
-    </div>
 
-    <div id="flashCard" class="flash-card">
-        <div id="flashIcon" class="flash-icon">🎯</div>
-        <div id="flashText" class="flash-text">Listo para Diapositivas</div>
-        <p style="color: var(--muted); font-size: 0.8rem; margin-top: 6px;">
-            1 toque = Avanzar | 2 toques = Retroceder
-        </p>
-    </div>
+        <!-- Tarjeta Guía Rápida: 3 Pasos Simples -->
+        <div class="card">
+            <div class="card-header">
+                <span>⚡ GUÍA DE INICIO RÁPIDO</span>
+                <span class="tag">3 PASOS</span>
+            </div>
+            <div class="step-list">
+                <div class="step-item">
+                    <span class="step-num">01</span>
+                    <div class="step-content">
+                        <strong>INSTALA EL APK EN TU CELULAR</strong>
+                        Descarga el archivo APK pulsando el botón superior e instálalo (autoriza instalar apps desconocidas si el navegador lo solicita).
+                    </div>
+                </div>
+                <div class="step-item">
+                    <span class="step-num">02</span>
+                    <div class="step-content">
+                        <strong>ABRE LA APP Y DETECTA TU LAPTOP</strong>
+                        Al estar en el mismo Wi-Fi, la app detectará esta laptop automáticamente por UDP en el puerto <code style="color: var(--accent); font-family: monospace;">8888</code>.
+                    </div>
+                </div>
+                <div class="step-item">
+                    <span class="step-num">03</span>
+                    <div class="step-content">
+                        <strong>ENLAZA TU SMARTWATCH & PRESENTA</strong>
+                        Abre tu presentación en Canva, PowerPoint o PDF. Pasa diapositivas girando la corona de tu reloj, usando el botón de cámara o la música.
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    <div class="manual-controls">
-        <button id="btnManualBack" class="btn-manual">⬅️ Retroceder</button>
-        <button id="btnManualPause" class="btn-manual" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #d8b4fe;">⏸️ Pausa (U)</button>
-        <button id="btnManualNext" class="btn-manual">Avanzar ➡️</button>
-    </div>
+        <!-- Tarjeta de Estado del Servidor & Clicker de Prueba -->
+        <div class="card">
+            <div class="card-header">
+                <span>🎛️ SERVIDOR LINUX & TEST CLICKER</span>
+                <span id="wsStatusBadge" class="tag" style="color: var(--danger); background: rgba(239, 68, 68, 0.1);">OFFLINE</span>
+            </div>
+            
+            <div class="hud-grid">
+                <div class="hud-node">
+                    <div class="hud-node-label">INYECTOR LINUX</div>
+                    <div class="hud-node-val">✓ /dev/uinput</div>
+                </div>
+                <div class="hud-node">
+                    <div class="hud-node-label">PUERTO LOCAL</div>
+                    <div class="hud-node-val" style="color: var(--accent);">:8888 (HTTPS)</div>
+                </div>
+            </div>
 
-    <div id="logBox" class="log-box"></div>
+            <!-- Visualizador de Tecla Inyectada -->
+            <div id="flashCard" class="flash-card">
+                <div id="flashText" class="flash-text">LISTO PARA DIAPOSITIVAS</div>
+                <div id="flashSub" class="flash-sub">ESCUCHANDO EVENTOS WEBSOCKET...</div>
+            </div>
+
+            <!-- Botones Mecánicos de Prueba -->
+            <div class="manual-controls">
+                <button id="btnManualBack" class="btn-manual">[ ◀ KEY_LEFT ]</button>
+                <button id="btnManualPause" class="btn-manual" style="border-color: #a855f7; color: #d8b4fe;">[ ⏸ KEY_U ]</button>
+                <button id="btnManualNext" class="btn-manual" style="border-color: var(--accent); color: var(--accent);">[ KEY_RIGHT ▶ ]</button>
+            </div>
+
+            <!-- Log de Consola -->
+            <div id="logBox" class="log-box"></div>
+        </div>
+    </div>
 
     <script>
-        const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9f';
-        const NUS_NOTIFY_CHAR = '6e400003-b5a3-f393-e0a9-e50e24dcca9f';
-        const BATT_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
-        const BATT_CHAR = '00002a19-0000-1000-8000-00805f9b34fb';
-
-        const wsStatus = document.getElementById('wsStatus');
-        const bleStatus = document.getElementById('bleStatus');
-        const batteryStatus = document.getElementById('batteryStatus');
-        const btnConnect = document.getElementById('btnConnect');
+        const wsStatusBadge = document.getElementById('wsStatusBadge');
         const flashCard = document.getElementById('flashCard');
-        const flashIcon = document.getElementById('flashIcon');
         const flashText = document.getElementById('flashText');
+        const flashSub = document.getElementById('flashSub');
         const logBox = document.getElementById('logBox');
+        const apkVersionPill = document.getElementById('apkVersionPill');
+        const apkDetails = document.getElementById('apkDetails');
 
         let ws = null;
-        let bleDevice = null;
-        let lastSeq = null;
 
         function log(msg) {
             const time = new Date().toLocaleTimeString();
             logBox.innerHTML = `<div>[${time}] ${msg}</div>` + logBox.innerHTML;
         }
 
-        // Mantener pantalla del celular despierta
-        if ('wakeLock' in navigator) {
-            navigator.wakeLock.request('screen').catch(() => {});
+        function triggerFlash(action, label, sub) {
+            flashText.innerText = label;
+            flashSub.innerText = sub || "INYECTADO EN /dev/uinput";
+            flashCard.className = `flash-card active-${action}`;
+            setTimeout(() => {
+                flashCard.className = 'flash-card';
+            }, 600);
         }
 
-        // 1. WebSocket a la PC
-        function connectWebSocket() {
+        // Cargar metadatos del APK
+        fetch('/api/app-info')
+            .then(res => res.json())
+            .then(data => {
+                if (data.version) {
+                    apkVersionPill.innerText = `v${data.version}`;
+                    apkVersionPill.style.color = "var(--success)";
+                    apkVersionPill.style.background = "rgba(16, 185, 129, 0.15)";
+                    apkDetails.innerText = `Versión v${data.version} • ${data.size_mb} • Android 8.0+`;
+                }
+            })
+            .catch(() => {
+                apkVersionPill.innerText = "ONLINE";
+            });
+
+        // Conectar WebSocket a la laptop
+        function connectWs() {
             const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${proto}//${location.host}/ws`;
-            log(`Conectando WebSocket a ${wsUrl}...`);
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                wsStatus.className = 'badge badge-online';
-                wsStatus.textContent = '🟢 Conectado';
-                log('✓ Conectado a la PC con éxito');
+                wsStatusBadge.innerText = "ONLINE";
+                wsStatusBadge.style.color = "var(--success)";
+                wsStatusBadge.style.background = "rgba(16, 185, 129, 0.15)";
+                log("✓ Conectado a la laptop vía WebSocket");
             };
 
             ws.onclose = () => {
-                wsStatus.className = 'badge badge-offline';
-                wsStatus.textContent = '🔴 Desconectado';
-                setTimeout(connectWebSocket, 2000);
+                wsStatusBadge.innerText = "RECONECTANDO...";
+                wsStatusBadge.style.color = "var(--warning)";
+                wsStatusBadge.style.background = "rgba(245, 158, 11, 0.15)";
+                setTimeout(connectWs, 2500);
             };
 
-            ws.onmessage = (e) => {
+            ws.onerror = () => {
+                ws.close();
+            };
+
+            ws.onmessage = (event) => {
                 try {
-                    const data = JSON.parse(e.data);
-                    if (data.action === 'forward') {
-                        triggerVisual('forward', '⏩ AVANZAR DIAPOSITIVA');
-                    } else if (data.action === 'back') {
-                        triggerVisual('back', '⏪ RETROCEDER DIAPOSITIVA');
-                    } else if (data.action === 'play_pause') {
-                        triggerVisual('pause', '⏸️ PAUSA / TELÓN (TECLA U)');
+                    const data = JSON.parse(event.data);
+                    if (data.action === "forward") {
+                        triggerFlash("forward", "⏩ KEY_RIGHT (ADELANTE)", "DISPARO DESDE SMARTWATCH O TELÉFONO");
+                        log("⏩ Evento: Avanzar (KEY_RIGHT)");
+                    } else if (data.action === "back") {
+                        triggerFlash("back", "⏪ KEY_LEFT (ATRÁS)", "DOBLE TOQUE O BOTÓN ATRÁS");
+                        log("⏪ Evento: Retroceder (KEY_LEFT)");
+                    } else if (data.action === "play_pause") {
+                        triggerFlash("pause", "⏯️ KEY_U (TELÓN/PAUSA)", "TELÓN CANVA O PAUSA MULTIMEDIA");
+                        log("⏯️ Evento: Telón / Pausa (KEY_U)");
                     }
-                } catch(err) {}
+                } catch (e) {}
             };
         }
 
-        function triggerVisual(type, text) {
-            flashIcon.textContent = type === 'forward' ? '⏩' : (type === 'back' ? '⏪' : '⏯️');
-            flashText.textContent = text;
-            flashCard.className = `flash-card active-${type}`;
-            if (navigator.vibrate) navigator.vibrate(50);
-            setTimeout(() => {
-                flashCard.className = 'flash-card';
-                flashIcon.textContent = '🎯';
-                flashText.textContent = 'Esperando pulsación...';
-            }, 700);
-        }
+        connectWs();
 
-        function sendEvent(type, seq = -1) {
+        // Botones de Prueba Manual
+        document.getElementById('btnManualBack').onclick = () => {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ event: type, sequence: seq, timestamp: Date.now() }));
+                ws.send(JSON.stringify({ event: "back" }));
             }
-        }
+        };
 
-        let heartbeatTimer = null;
-        let isAutoReconnecting = false;
-
-        async function setupServices(server) {
-            // Servicio Nordic UART (Laxasfit)
-            const nus = await server.getPrimaryService(NUS_SERVICE);
-            const charNotify = await nus.getCharacteristic(NUS_NOTIFY_CHAR);
-            await charNotify.startNotifications();
-            charNotify.addEventListener('characteristicvaluechanged', onPacketReceived);
-            log('✓ Suscrito a notificaciones de Cámara!');
-
-            // Heartbeat cada 3s para evitar desconexión del firmware
-            try {
-                const battServ = await server.getPrimaryService(BATT_SERVICE);
-                const battChar = await battServ.getCharacteristic(BATT_CHAR);
-                const bVal = await battChar.readValue();
-                batteryStatus.textContent = `${bVal.getUint8(0)}%`;
-
-                if (heartbeatTimer) clearInterval(heartbeatTimer);
-                heartbeatTimer = setInterval(async () => {
-                    if (bleDevice && bleDevice.gatt.connected) {
-                        try {
-                            const v = await battChar.readValue();
-                            batteryStatus.textContent = `${v.getUint8(0)}%`;
-                        } catch(e) {}
-                    }
-                }, 3000);
-            } catch(e) {}
-        }
-
-        async function autoReconnect() {
-            if (!bleDevice || bleDevice.gatt.connected || isAutoReconnecting) return;
-            isAutoReconnecting = true;
-            bleStatus.className = 'badge badge-offline';
-            bleStatus.textContent = '⏳ Reconectando...';
-
-            const tryConnect = async () => {
-                if (!bleDevice || bleDevice.gatt.connected) {
-                    isAutoReconnecting = false;
-                    return;
-                }
-                try {
-                    log('Auto-reconectando al reloj...');
-                    const server = await bleDevice.gatt.connect();
-                    await setupServices(server);
-                    bleStatus.className = 'badge badge-online';
-                    bleStatus.textContent = `🟢 ${bleDevice.name || 'Conectado'}`;
-                    btnConnect.textContent = '✓ Reloj Conectado';
-                    log('✓ Reconexión automática completada!');
-                    isAutoReconnecting = false;
-                } catch(err) {
-                    setTimeout(tryConnect, 1500);
-                }
-            };
-
-            tryConnect();
-        }
-
-        // 2. Web Bluetooth API
-        async function connectBLE() {
-            if (!navigator.bluetooth) {
-                alert('Tu navegador no soporta Web Bluetooth. Usa Google Chrome en Android.');
-                return;
+        document.getElementById('btnManualPause').onclick = () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ event: "play_pause" }));
             }
+        };
 
-            try {
-                log('Buscando dispositivos Bluetooth...');
-                btnConnect.disabled = true;
-
-                bleDevice = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [NUS_SERVICE, BATT_SERVICE, '00003802-0000-1000-8000-00805f9b34fb']
-                });
-
-                log(`Dispositivo seleccionado: ${bleDevice.name}`);
-                bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
-
-                log('Conectando al servidor GATT...');
-                const server = await bleDevice.gatt.connect();
-
-                bleStatus.className = 'badge badge-online';
-                bleStatus.textContent = `🟢 ${bleDevice.name || 'Conectado'}`;
-                btnConnect.textContent = '✓ Reloj Conectado';
-                btnConnect.disabled = false;
-                log('✓ GATT Conectado.');
-
-                await setupServices(server);
-
-            } catch (err) {
-                log(`[!] Error BLE: ${err.message}`);
-                btnConnect.disabled = false;
+        document.getElementById('btnManualNext').onclick = () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ event: "forward" }));
             }
-        }
-
-        function onDisconnected() {
-            if (heartbeatTimer) clearInterval(heartbeatTimer);
-            bleStatus.className = 'badge badge-offline';
-            bleStatus.textContent = '⚪ Desconectado';
-            btnConnect.textContent = '🔗 Reconectar Smartwatch';
-            log('[!] Reloj desconectado. Intentando auto-reconexión...');
-            autoReconnect();
-        }
-
-        function onPacketReceived(event) {
-            const data = event.target.value;
-            let hexArr = [];
-            for (let i = 0; i < data.byteLength; i++) {
-                hexArr.push(data.getUint8(i).toString(16).padStart(2, '0').toUpperCase());
-            }
-            const hex = hexArr.join('');
-
-            // Protocolo Laxasfit: DF 00 06 ... 0C 01
-            if (hex.startsWith('DF0006') && hex.includes('0C01')) {
-                const seq = data.getUint8(6);
-                if (seq === lastSeq) return; // descartar ráfaga
-                lastSeq = seq;
-                log(`🎯 Disparo reloj (Seq: ${seq})`);
-                sendEvent('shutter', seq);
-            }
-        }
-
-        btnConnect.addEventListener('click', connectBLE);
-        document.getElementById('btnManualNext').addEventListener('click', () => sendEvent('forward'));
-        document.getElementById('btnManualBack').addEventListener('click', () => sendEvent('back'));
-        document.getElementById('btnManualPause').addEventListener('click', () => sendEvent('play_pause'));
-
-        connectWebSocket();
-
-        async function updateApkInfo() {
-            try {
-                const res = await fetch('/api/app-info');
-                if (res.ok) {
-                    const info = await res.json();
-                    const tag = document.getElementById('apkVersionTag');
-                    const meta = document.getElementById('apkMetaDetails');
-                    if (tag && info.version) {
-                        tag.textContent = `v${info.version}`;
-                    }
-                    if (meta) {
-                        if (info.apk_exists) {
-                            meta.innerHTML = `📦 ${info.size_mb} • 🕒 Compilado: <b style="color: #cbd5e1;">${info.build_time}</b>`;
-                        } else {
-                            meta.innerHTML = `<span style="color: #ef4444;">⚠️ APK aún no compilado</span>`;
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn('No se pudo consultar información del APK:', e);
-            }
-        }
-        updateApkInfo();
-        setInterval(updateApkInfo, 10000);
+        };
     </script>
 </body>
 </html>

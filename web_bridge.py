@@ -143,6 +143,13 @@ class BridgeServer:
         self.pending_forward_task = None
         self.connected_sockets = set()
 
+    async def _broadcast(self, data):
+        for s in list(self.connected_sockets):
+            try:
+                await s.send_json(data)
+            except Exception:
+                pass
+
     async def handle_index(self, request):
         index_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
         if os.path.exists(index_path):
@@ -154,7 +161,7 @@ class BridgeServer:
         await ws.prepare(request)
         self.connected_sockets.add(ws)
         client_ip = request.remote
-        print(f"\n[+] Teléfono conectado por WebSocket desde {client_ip}")
+        print(f"\n[+] Cliente conectado por WebSocket desde {client_ip} (Total: {len(self.connected_sockets)})")
 
         try:
             async for msg in ws:
@@ -169,21 +176,21 @@ class BridgeServer:
                         self.clicker.forward()
                         now_str = datetime.datetime.now().strftime("%H:%M:%S")
                         print(f"[{now_str}] ⏩ Click manual: Avanzar")
-                        await ws.send_json({"action": "forward"})
+                        await self._broadcast({"action": "forward"})
                     elif event_type == "back":
                         self.clicker.back()
                         now_str = datetime.datetime.now().strftime("%H:%M:%S")
                         print(f"[{now_str}] ⏪ Click manual: Retroceder")
-                        await ws.send_json({"action": "back"})
+                        await self._broadcast({"action": "back"})
                     elif event_type in ("play_pause", "pause"):
                         self.clicker.pause()
                         now_str = datetime.datetime.now().strftime("%H:%M:%S")
                         print(f"[{now_str}] ⏯️ Pausa / Tecla U pulsada (Canva Telón)")
-                        await ws.send_json({"action": "play_pause"})
+                        await self._broadcast({"action": "play_pause"})
 
         finally:
-            self.connected_sockets.remove(ws)
-            print(f"[-] Teléfono desconectado de {client_ip}")
+            self.connected_sockets.discard(ws)
+            print(f"[-] Cliente desconectado de {client_ip} (Restantes: {len(self.connected_sockets)})")
         return ws
 
     async def _process_shutter(self, seq_num, ws):
@@ -203,10 +210,7 @@ class BridgeServer:
             self.pending_forward_task = None
             self.clicker.back()
             print(f"[{now_str}] ⏪ DOBLE TOQUE desde reloj (Seq: {seq_num}) ➜ Retroceder")
-            try:
-                await ws.send_json({"action": "back"})
-            except Exception:
-                pass
+            await self._broadcast({"action": "back"})
         else:
             # 1er toque: programar avance diferido para dar tiempo al doble toque
             async def delayed_forward(s=seq_num, t_str=now_str):
@@ -214,10 +218,7 @@ class BridgeServer:
                     await asyncio.sleep(self.double_tap_sec)
                     self.clicker.forward()
                     print(f"[{t_str}] ⏩ TOQUE SIMPLE desde reloj (Seq: {s}) ➜ Avanzar")
-                    try:
-                        await ws.send_json({"action": "forward"})
-                    except Exception:
-                        pass
+                    await self._broadcast({"action": "forward"})
                 except asyncio.CancelledError:
                     pass
                 finally:

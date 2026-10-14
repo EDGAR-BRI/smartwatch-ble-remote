@@ -23,7 +23,7 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.4+5";
+const String appVersion = "1.0.5+6";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
 const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media_session');
 
@@ -80,6 +80,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
   bool _batteryOptIgnored = false;
   bool _bluetoothEnabled = true;
   bool _permissionsGranted = false;
+  bool _isCheckingUpdate = false;
   int? _lastSequence;
   String _watchBattery = "--%";
   String _lastActionText = "Esperando pulsación...";
@@ -221,6 +222,315 @@ class _PresenterScreenState extends State<PresenterScreen> {
   }
 
   // 2. Conexión WebSocket con la PC Linux (WSS en puerto 8888 o WS en 8080)
+  Uri _getPcHttpUri(String path) {
+    var raw = _pcController.text.trim();
+    raw = raw.replaceFirst(RegExp(r'^(wss?|https?)://'), '');
+    if (raw.endsWith('/')) raw = raw.substring(0, raw.length - 1);
+    if (raw.endsWith('/ws')) raw = raw.substring(0, raw.length - 3);
+    final isHttp = raw.contains(':8080');
+    final scheme = isHttp ? 'http' : 'https';
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return Uri.parse('$scheme://$raw$normalizedPath');
+  }
+
+  Future<void> _checkForUpdates({bool manual = false}) async {
+    if (_isCheckingUpdate) return;
+    _isCheckingUpdate = true;
+
+    try {
+      if (manual) {
+        _log("Buscando actualización en PC...");
+      }
+
+      final infoUri = _getPcHttpUri('/api/app-info');
+      final client = HttpClient()..badCertificateCallback = ((c, h, p) => true);
+      client.connectionTimeout = const Duration(seconds: 4);
+
+      final request = await client.getUrl(infoUri);
+      final response = await request.close().timeout(const Duration(seconds: 4));
+
+      if (response.statusCode != 200) {
+        if (manual) _log("[!] Error consultando versión: HTTP ${response.statusCode}");
+        client.close();
+        _isCheckingUpdate = false;
+        return;
+      }
+
+      final responseBody = await response.transform(utf8.decoder).join();
+      client.close();
+
+      final data = jsonDecode(responseBody) as Map<String, dynamic>;
+      final serverVersion = data['version']?.toString() ?? "";
+      final sizeMb = data['size_mb']?.toString() ?? "";
+      final apkExists = data['apk_exists'] == true;
+      final buildTime = data['build_time']?.toString() ?? "";
+
+      if (!apkExists) {
+        if (manual && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("No se encontró ningún APK compilado en el servidor."),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        _isCheckingUpdate = false;
+        return;
+      }
+
+      final hasUpdate = serverVersion.isNotEmpty && serverVersion != appVersion;
+
+      if (!hasUpdate) {
+        if (manual && mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF1E293B),
+              title: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Color(0xFF22C55E)),
+                  SizedBox(width: 8),
+                  Text("App al día"),
+                ],
+              ),
+              content: Text("Tienes la versión más reciente instalada:\nv$appVersion ($sizeMb)"),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("Cerrar"),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8)),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _downloadAndInstallApk(serverVersion, sizeMb);
+                  },
+                  child: const Text("Reinstalar APK", style: TextStyle(color: Colors.black)),
+                ),
+              ],
+            ),
+          );
+        }
+        _isCheckingUpdate = false;
+        return;
+      }
+
+      // Hay nueva versión disponible
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            title: const Row(
+              children: [
+                Icon(Icons.system_update, color: Color(0xFF38BDF8)),
+                SizedBox(width: 8),
+                Text("Actualización Disponible"),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text("Versión actual: v$appVersion", style: const TextStyle(color: Colors.white70)),
+                const SizedBox(height: 4),
+                Text("Nueva versión: v$serverVersion", style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 4),
+                Text("Tamaño: $sizeMb  •  Fecha: $buildTime", style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                const SizedBox(height: 12),
+                const Text("¿Deseas descargar e instalar esta versión directamente?"),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Más tarde"),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF22C55E),
+                  foregroundColor: Colors.black,
+                ),
+                icon: const Icon(Icons.download, size: 18),
+                label: const Text("Actualizar Ahora", style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _downloadAndInstallApk(serverVersion, sizeMb);
+                },
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (manual) {
+        _log("[!] Error al verificar actualizaciones: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error al buscar actualización: $e"),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } finally {
+      _isCheckingUpdate = false;
+    }
+  }
+
+  Future<void> _downloadAndInstallApk(String version, String sizeMb) async {
+    try {
+      // 1. Verificar permiso de instalación de fuentes desconocidas
+      if (Platform.isAndroid) {
+        final canInstall = await _mediaChannel.invokeMethod<bool>('canInstallApk') ?? true;
+        if (!canInstall) {
+          if (mounted) {
+            final grant = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                backgroundColor: const Color(0xFF1E293B),
+                title: const Text("Permiso de Instalación Requerido"),
+                content: const Text(
+                  "Android requiere autorización para instalar actualizaciones directamente desde esta aplicación.\n\n"
+                  "Por favor presiona 'Autorizar' y activa 'Confiar en esta fuente'.",
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text("Cancelar"),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF38BDF8)),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text("Autorizar", style: TextStyle(color: Colors.black)),
+                  ),
+                ],
+              ),
+            );
+
+            if (grant == true) {
+              await _mediaChannel.invokeMethod('requestInstallPermission');
+            }
+            return;
+          }
+        }
+      }
+
+      // 2. Diálogo de progreso de descarga
+      double progress = 0.0;
+      String statusText = "Iniciando descarga...";
+      StateSetter? dialogSetState;
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setDState) {
+              dialogSetState = setDState;
+              return AlertDialog(
+                backgroundColor: const Color(0xFF1E293B),
+                title: Row(
+                  children: [
+                    const Icon(Icons.downloading, color: Color(0xFF38BDF8)),
+                    const SizedBox(width: 8),
+                    Text("Descargando v$version"),
+                  ],
+                ),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LinearProgressIndicator(
+                      value: progress > 0 ? progress : null,
+                      backgroundColor: Colors.white10,
+                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(statusText, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+
+      // 3. Descarga vía HttpClient al cache interno
+      final cacheDir = await _mediaChannel.invokeMethod<String>('getCacheDir');
+      final apkFile = File('$cacheDir/update.apk');
+      if (await apkFile.exists()) {
+        try {
+          await apkFile.delete();
+        } catch (_) {}
+      }
+
+      final client = HttpClient()..badCertificateCallback = ((c, h, p) => true);
+      final request = await client.getUrl(_getPcHttpUri('/app.apk'));
+      final response = await request.close();
+
+      if (response.statusCode != 200) {
+        throw Exception("Error del servidor: HTTP ${response.statusCode}");
+      }
+
+      final totalBytes = response.contentLength;
+      int receivedBytes = 0;
+      final sink = apkFile.openWrite();
+
+      await response.forEach((chunk) {
+        sink.add(chunk);
+        receivedBytes += chunk.length;
+        if (dialogSetState != null && totalBytes > 0) {
+          dialogSetState!(() {
+            progress = receivedBytes / totalBytes;
+            final rec = (receivedBytes / (1024 * 1024)).toStringAsFixed(1);
+            final tot = (totalBytes / (1024 * 1024)).toStringAsFixed(1);
+            final pct = (progress * 100).toInt();
+            statusText = "$pct% ($rec / $tot MB)";
+          });
+        }
+      });
+
+      await sink.close();
+      client.close();
+
+      if (mounted) {
+        try {
+          Navigator.of(context, rootNavigator: true).pop(); // Cierra el diálogo de progreso
+        } catch (_) {}
+      }
+
+      _log("✓ Descarga finalizada: ${(receivedBytes / (1024 * 1024)).toStringAsFixed(1)} MB");
+      _log("Abriendo instalador del sistema...");
+
+      // 4. Lanzar instalación con FileProvider
+      await _mediaChannel.invokeMethod('installApk', {'filePath': apkFile.path});
+
+    } catch (e) {
+      if (mounted) {
+        try {
+          Navigator.of(context, rootNavigator: true).pop();
+        } catch (_) {}
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            title: const Text("Error de Descarga"),
+            content: Text("Ocurrió un error al descargar la actualización:\n$e"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("Entendido"),
+              ),
+            ],
+          ),
+        );
+      }
+      _log("[!] Error actualizando app: $e");
+    }
+  }
+
   void _connectWebSocket() {
     _wsReconnectTimer?.cancel();
     final target = _pcController.text.trim();
@@ -250,6 +560,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
           if (!_isWsConnected) {
             setState(() => _isWsConnected = true);
             _log("✓ WebSocket con PC CONECTADO");
+            _checkForUpdates(manual: false);
           }
           try {
             final data = jsonDecode(message.toString());
@@ -275,6 +586,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
       // Enviar saludo inicial
       _sendWs("hello");
       setState(() => _isWsConnected = true);
+      _checkForUpdates(manual: false);
     } catch (e) {
       setState(() => _isWsConnected = false);
       _log("[!] Excepción al conectar WS: $e");
@@ -622,6 +934,11 @@ class _PresenterScreenState extends State<PresenterScreen> {
         backgroundColor: const Color(0xFF1E293B),
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.system_update_alt, color: Color(0xFF38BDF8)),
+            tooltip: 'Buscar Actualización (OTA)',
+            onPressed: () => _checkForUpdates(manual: true),
+          ),
           IconButton(
             icon: Icon(Icons.refresh, color: _isScanning ? Colors.amber : Colors.white),
             tooltip: 'Escanear Bluetooth',

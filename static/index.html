@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smartwatch Presenter // Developer Portal</title>
+    <title>BT Clicker // Developer Portal</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <style>
         :root {
@@ -289,9 +289,9 @@
         <!-- Encabezado con Mascota -->
         <div class="header">
             <div class="logo-box">
-                <img src="/static/img/logo.png" alt="Smartwatch Presenter" class="logo-img">
+                <img src="/static/img/logo.png" alt="BT Clicker" class="logo-img">
             </div>
-            <h1>SMARTWATCH <span>// PRESENTER</span></h1>
+            <h1>BT <span>// CLICKER</span></h1>
             <p>PORTAL DE DESCARGA & PUENTE LINUX uinput</p>
         </div>
 
@@ -301,9 +301,9 @@
                 <span>📦 BINARIO ANDROID OFICIAL</span>
                 <span id="apkVersionPill" class="tag">CARGANDO...</span>
             </div>
-            <a id="btnDownloadApk" href="/app.apk" download class="btn-download">
-                <span class="title">📥 DESCARGAR APK ANDROID</span>
-                <span id="apkDetails" class="subtitle">SmartwatchPresenter.apk</span>
+            <a id="btnDownloadApk" href="/BTClicker.apk" download class="btn-download">
+                <span class="title">📥 DESCARGAR BT CLICKER (APK)</span>
+                <span id="apkDetails" class="subtitle">BTClicker.apk</span>
             </a>
             <a id="btnGithubRelease" href="https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest" target="_blank" class="btn-github">
                 <span>🐙 [ GITHUB RELEASES // CÓDIGO & VERSIONES ]</span>
@@ -334,8 +334,8 @@
                 <div class="step-item">
                     <span class="step-num">03</span>
                     <div class="step-content">
-                        <strong>ENLAZA TU SMARTWATCH & PRESENTA</strong>
-                        Abre tu presentación en Canva, PowerPoint o PDF. Pasa diapositivas girando la corona de tu reloj, usando el botón de cámara o la música.
+                        <strong>ENLAZA TU CONTROL Y PRESENTA</strong>
+                        Abre tu presentación en Canva, PowerPoint o PDF. Pasa diapositivas con Smartwatch, Auriculares Bluetooth (toque de música) o disparadores BLE.
                     </div>
                 </div>
             </div>
@@ -445,7 +445,7 @@
                 try {
                     const data = JSON.parse(event.data);
                     if (data.action === "forward") {
-                        triggerFlash("forward", "⏩ KEY_RIGHT (ADELANTE)", "DISPARO DESDE SMARTWATCH O TELÉFONO");
+                        triggerFlash("forward", "⏩ KEY_RIGHT (ADELANTE)", "DISPARO DESDE RELOJ, AURICULARES O BLE");
                         log("⏩ Evento: Avanzar (KEY_RIGHT)");
                     } else if (data.action === "back") {
                         triggerFlash("back", "⏪ KEY_LEFT (ATRÁS)", "DOBLE TOQUE O BOTÓN ATRÁS");

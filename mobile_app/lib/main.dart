@@ -23,8 +23,8 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.11+12";
-const String githubLatestApkUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/SmartwatchPresenter.apk";
+const String appVersion = "1.0.12+13";
+const String githubLatestApkUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/BTClicker.apk";
 const String githubLatestReleaseUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
 const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media_session');
@@ -32,16 +32,16 @@ const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = DevHttpOverrides();
-  runApp(const SmartwatchPresenterApp());
+  runApp(const BTClickerApp());
 }
 
-class SmartwatchPresenterApp extends StatelessWidget {
-  const SmartwatchPresenterApp({super.key});
+class BTClickerApp extends StatelessWidget {
+  const BTClickerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Smartwatch Presenter',
+      title: 'BT Clicker',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF070A11),
@@ -1081,15 +1081,15 @@ class _PresenterScreenState extends State<PresenterScreen> {
       accentColor = const Color(0xFF10B981);
       statusText = "ONLINE";
     } else if (_isBleConnected && !_isWsConnected) {
-      mascotMessage = "Smartwatch enlazado vía BLE NUS. Pulsa [RADAR] para enlazar laptop Wi-Fi.";
+      mascotMessage = "Dispositivo BLE enlazado. Pulsa [RADAR] para enlazar laptop Wi-Fi.";
       accentColor = const Color(0xFF00F0FF);
       statusText = "BLE_ACTIVE";
     } else if (!_isBleConnected && _isWsConnected) {
-      mascotMessage = "Host WebSocket conectado. Escanea para vincular GATT NUS o rueda AVRCP.";
+      mascotMessage = "Laptop conectada. Escuchando Smartwatch, Auriculares BT y mandos BLE.";
       accentColor = const Color(0xFFF59E0B);
       statusText = "WS_ACTIVE";
     } else {
-      mascotMessage = "Esperando enlaces. Enlaza tu reloj por Bluetooth y tu laptop por Wi-Fi.";
+      mascotMessage = "Listo: Usa Smartwatch, Auriculares Bluetooth (toque de pista) o BLE.";
       accentColor = const Color(0xFF00F0FF);
       statusText = "STANDBY";
     }
@@ -1111,7 +1111,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text(
-                  "⚡ Sparky: 'uinput activo. 1 toque = KEY_RIGHT | 2 toques = KEY_LEFT | Pausa = KEY_U'",
+                  "⚡ Sparky: 'BT Clicker: 1 toque = KEY_RIGHT | 2 toques = KEY_LEFT | Pausa = KEY_U'",
                   style: TextStyle(fontFamily: 'monospace', fontSize: 12),
                 ),
                 duration: Duration(seconds: 2),
@@ -1208,7 +1208,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
       "00.45s [BLE] Bluetooth Low Energy GATT NUS armed",
       "00.90s [NET] UDP Discovery beacon on :8889",
       "01.40s [AVRCP] MediaSession event listener ready",
-      "01.90s [OK] Sparky presentation engine online",
+      "01.90s [OK] Sparky BT Clicker engine online",
     ];
 
     final progress = (_bootStep + 1) / 5.0;
@@ -1236,7 +1236,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        "SYS_BOOT // KERNEL v1.0.11",
+                        "SYS_BOOT // KERNEL v1.0.12",
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 11,
@@ -1313,31 +1313,31 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
-                        "SMARTWATCH",
+                        "BT",
                         style: TextStyle(
                           fontFamily: 'monospace',
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
                           letterSpacing: 1.5,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       Text(
                         "//",
                         style: TextStyle(
                           fontFamily: 'monospace',
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.w900,
                           color: const Color(0xFF00F0FF).withValues(alpha: 0.8),
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       const Text(
-                        "PRESENTER",
+                        "CLICKER",
                         style: TextStyle(
                           fontFamily: 'monospace',
-                          fontSize: 20,
+                          fontSize: 22,
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF00F0FF),
                           letterSpacing: 1.5,
@@ -1347,10 +1347,10 @@ class _PresenterScreenState extends State<PresenterScreen> {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    "LINUX INPUT INJECTOR • BLE + AVRCP PROTOCOL",
+                    "UNIVERSAL SLIDE REMOTE • RELOJ • AURICULARES • BLE",
                     style: TextStyle(
                       fontFamily: 'monospace',
-                      fontSize: 11,
+                      fontSize: 10,
                       color: Color(0xFF94A3B8),
                       letterSpacing: 0.8,
                     ),
@@ -1466,7 +1466,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
         title: Row(
           children: [
             const Text(
-              'PRESENTER',
+              'BT CLICKER',
               style: TextStyle(
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.w900,

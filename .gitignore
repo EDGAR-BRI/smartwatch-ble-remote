@@ -28,6 +28,7 @@ env/
 key.pem
 cert.pem
 
-# Logs & temp
+# Logs, APKs & temp
 *.log
+*.apk
 .DS_Store

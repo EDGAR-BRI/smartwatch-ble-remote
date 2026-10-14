@@ -37,7 +37,7 @@ El sistema resuelve las limitaciones de Bluetooth en Linux (fallas de emparejami
    ▼
 [ Kernel Linux uinput (`evdev`) ]
    │  - Teclado virtual ('Smartwatch-Phone-Bridge')
-   │  - Inyecta `KEY_RIGHT` (Avanzar) o `KEY_LEFT` (Retroceder)
+   │  - Inyecta `KEY_RIGHT` (Avanzar), `KEY_LEFT` (Retroceder) o `KEY_U` (Pausa / Telón Canva)
    ▼
 [ Diapositivas (Canva / Chrome / LibreOffice / Evince) ]
 ```
@@ -57,6 +57,9 @@ Muchos relojes chinos/genéricos (DaFit, FitPro, HryFine, etc.) usan el servicio
 
 ### Modo B: Controles de Música Bluetooth Clásico (AVRCP)
 Permite usar los botones físicos o de pantalla del reloj (Siguiente ⏭️, Anterior ⏮️, Play/Pausa ⏯️):
+- **Siguiente (⏭️):** Inyecta `KEY_RIGHT` (Avanzar diapositiva).
+- **Anterior (⏮️):** Inyecta `KEY_LEFT` (Retroceder diapositiva).
+- **Play/Pausa (⏯️):** Inyecta `KEY_U` (Abre/cierra cortina o efecto telón en Canva).
 - Se implementa en Android nativo mediante `android.media.session.MediaSession`.
 - **Problema encontrado:** Si Android no está reproduciendo audio activamente, el reloj oculta los controles o el sistema desactiva el `MediaSession`.
 - **Solución:**

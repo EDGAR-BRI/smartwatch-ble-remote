@@ -33,6 +33,7 @@ SUPPORTED_KEYS = {
     "ENTER": ecodes.KEY_ENTER,
     "F5": ecodes.KEY_F5,
     "ESC": ecodes.KEY_ESC,
+    "U": ecodes.KEY_U,
 }
 
 

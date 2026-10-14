@@ -23,7 +23,7 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.7+8";
+const String appVersion = "1.0.8+9";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
 const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media_session');
 
@@ -140,9 +140,10 @@ class _PresenterScreenState extends State<PresenterScreen> {
           _triggerHaptic("back");
           _sendWs("back");
         } else if (action == "play_pause") {
-          _log("🎵 Reloj ➔ Play/Pausa");
-          _triggerFlash(Colors.purpleAccent, "⏯️ PLAY/PAUSA");
+          _log("🎵 Reloj ➔ Pausa (Tecla U)");
+          _triggerFlash(Colors.purpleAccent, "⏯️ PAUSA (U)");
           _triggerHaptic("play_pause");
+          _sendWs("play_pause");
         }
       }
     });
@@ -686,6 +687,9 @@ class _PresenterScreenState extends State<PresenterScreen> {
             } else if (data['action'] == 'back') {
               _triggerFlash(Colors.blue, "⏪ RETROCEDER (Diapositiva)");
               _triggerHaptic("back");
+            } else if (data['action'] == 'play_pause') {
+              _triggerFlash(Colors.purpleAccent, "⏯️ PAUSA (Tecla U)");
+              _triggerHaptic("play_pause");
             }
           } catch (_) {}
         },
@@ -1350,10 +1354,28 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     ),
                     icon: const Icon(Icons.arrow_back, size: 18),
                     label: const Text("Atrás"),
-                    onPressed: () => _sendWs("back"),
+                    onPressed: () {
+                      _triggerHaptic("back");
+                      _triggerFlash(const Color(0xFF38BDF8), "⏪ RETROCEDER");
+                      _sendWs("back");
+                    },
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                    backgroundColor: const Color(0xFF581C87),
+                  ),
+                  icon: const Icon(Icons.pause, size: 18, color: Colors.purpleAccent),
+                  label: const Text("U", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  onPressed: () {
+                    _triggerHaptic("play_pause");
+                    _triggerFlash(Colors.purpleAccent, "⏯️ PAUSA (U)");
+                    _sendWs("play_pause");
+                  },
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
@@ -1362,7 +1384,11 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     ),
                     icon: const Icon(Icons.arrow_forward, size: 18),
                     label: const Text("Adelante"),
-                    onPressed: () => _sendWs("forward"),
+                    onPressed: () {
+                      _triggerHaptic("forward");
+                      _triggerFlash(const Color(0xFF22C55E), "⏩ AVANZAR");
+                      _sendWs("forward");
+                    },
                   ),
                 ),
               ],

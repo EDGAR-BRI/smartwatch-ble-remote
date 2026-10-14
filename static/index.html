@@ -112,6 +112,11 @@
             border-color: var(--accent);
             box-shadow: 0 0 30px var(--accent-glow);
         }
+        .flash-card.active-pause {
+            background: rgba(168, 85, 247, 0.15);
+            border-color: #a855f7;
+            box-shadow: 0 0 30px rgba(168, 85, 247, 0.3);
+        }
         .flash-icon {
             font-size: 3rem;
             margin-bottom: 8px;
@@ -200,6 +205,7 @@
 
     <div class="manual-controls">
         <button id="btnManualBack" class="btn-manual">⬅️ Retroceder</button>
+        <button id="btnManualPause" class="btn-manual" style="background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #d8b4fe;">⏸️ Pausa (U)</button>
         <button id="btnManualNext" class="btn-manual">Avanzar ➡️</button>
     </div>
 
@@ -260,13 +266,15 @@
                         triggerVisual('forward', '⏩ AVANZAR DIAPOSITIVA');
                     } else if (data.action === 'back') {
                         triggerVisual('back', '⏪ RETROCEDER DIAPOSITIVA');
+                    } else if (data.action === 'play_pause') {
+                        triggerVisual('pause', '⏸️ PAUSA / TELÓN (TECLA U)');
                     }
                 } catch(err) {}
             };
         }
 
         function triggerVisual(type, text) {
-            flashIcon.textContent = type === 'forward' ? '⏩' : '⏪';
+            flashIcon.textContent = type === 'forward' ? '⏩' : (type === 'back' ? '⏪' : '⏯️');
             flashText.textContent = text;
             flashCard.className = `flash-card active-${type}`;
             if (navigator.vibrate) navigator.vibrate(50);
@@ -407,6 +415,7 @@
         btnConnect.addEventListener('click', connectBLE);
         document.getElementById('btnManualNext').addEventListener('click', () => sendEvent('forward'));
         document.getElementById('btnManualBack').addEventListener('click', () => sendEvent('back'));
+        document.getElementById('btnManualPause').addEventListener('click', () => sendEvent('play_pause'));
 
         connectWebSocket();
 

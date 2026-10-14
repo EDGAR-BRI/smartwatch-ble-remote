@@ -27,18 +27,21 @@ SUPPORTED_KEYS = {
     "PAGEDOWN": ecodes.KEY_PAGEDOWN,
     "PAGEUP": ecodes.KEY_PAGEUP,
     "SPACE": ecodes.KEY_SPACE,
+    "U": ecodes.KEY_U,
 }
 
 
 class VirtualClicker:
-    def __init__(self, key_forward="RIGHT", key_back="LEFT"):
+    def __init__(self, key_forward="RIGHT", key_back="LEFT", key_pause="U"):
         self.code_forward = SUPPORTED_KEYS.get(key_forward.upper(), ecodes.KEY_RIGHT)
         self.code_back = SUPPORTED_KEYS.get(key_back.upper(), ecodes.KEY_LEFT)
+        self.code_pause = SUPPORTED_KEYS.get(key_pause.upper(), ecodes.KEY_U)
         capabilities = {ecodes.EV_KEY: list(SUPPORTED_KEYS.values())}
         self.uinput = evdev.UInput(events=capabilities, name="Smartwatch-Phone-Bridge")
         print(f"[✓] Teclado virtual uinput listo: 'Smartwatch-Phone-Bridge'")
         print(f"    - Avanzar:    [{key_forward}]")
         print(f"    - Retroceder: [{key_back}]")
+        print(f"    - Pausa (U):  [{key_pause}]")
 
     def emit(self, keycode):
         self.uinput.write(ecodes.EV_KEY, keycode, 1)
@@ -52,6 +55,9 @@ class VirtualClicker:
 
     def back(self):
         self.emit(self.code_back)
+
+    def pause(self):
+        self.emit(self.code_pause)
 
 
 def get_local_ip():
@@ -162,6 +168,11 @@ class BridgeServer:
                         now_str = datetime.datetime.now().strftime("%H:%M:%S")
                         print(f"[{now_str}] ⏪ Click manual: Retroceder")
                         await ws.send_json({"action": "back"})
+                    elif event_type in ("play_pause", "pause"):
+                        self.clicker.pause()
+                        now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                        print(f"[{now_str}] ⏯️ Pausa / Tecla U pulsada (Canva Telón)")
+                        await ws.send_json({"action": "play_pause"})
 
         finally:
             self.connected_sockets.remove(ws)

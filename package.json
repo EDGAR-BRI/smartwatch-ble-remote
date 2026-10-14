@@ -1,6 +1,6 @@
 {
   "name": "smartwatch-remote-presenter",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Control de diapositivas en Linux con Smartwatch vía BLE, AVRCP y uinput",
   "main": "web_bridge.py",
   "scripts": {

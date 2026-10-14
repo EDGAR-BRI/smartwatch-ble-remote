@@ -23,7 +23,7 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.6+7";
+const String appVersion = "1.0.7+8";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
 const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media_session');
 
@@ -81,6 +81,10 @@ class _PresenterScreenState extends State<PresenterScreen> {
   bool _bluetoothEnabled = true;
   bool _permissionsGranted = false;
   bool _isCheckingUpdate = false;
+  bool _hapticEnabled = true;
+  bool _isDiscovering = false;
+  RawDatagramSocket? _discoverySocket;
+  Timer? _discoveryTimeoutTimer;
   int? _lastSequence;
   String _watchBattery = "--%";
   String _lastActionText = "Esperando pulsación...";
@@ -99,8 +103,21 @@ class _PresenterScreenState extends State<PresenterScreen> {
       await WakelockPlus.enable();
     } catch (_) {}
 
+    // Limpieza de APK previo si ya se completó una actualización
+    try {
+      final cacheDir = await _mediaChannel.invokeMethod<String>('getCacheDir');
+      if (cacheDir != null) {
+        final oldApk = File('$cacheDir/update.apk');
+        if (await oldApk.exists()) {
+          await oldApk.delete();
+          _log("✓ Caché de actualización previa liberada");
+        }
+      }
+    } catch (_) {}
+
     await _requestPermissions();
     _listenAdapterState();
+    _startDiscovery(manual: false);
     _connectWebSocket();
     _setupMediaSession();
     if (_permissionsGranted) {
@@ -115,14 +132,17 @@ class _PresenterScreenState extends State<PresenterScreen> {
         if (action == "forward") {
           _log("🎵 Reloj (Botón/Rueda ➔) ➔ Avanzar");
           _triggerFlash(const Color(0xFF22C55E), "⏩ AVANZAR");
+          _triggerHaptic("forward");
           _sendWs("forward");
         } else if (action == "back") {
           _log("🎵 Reloj (Botón/Rueda ⬅) ➔ Retroceder");
           _triggerFlash(const Color(0xFF38BDF8), "⏪ RETROCEDER");
+          _triggerHaptic("back");
           _sendWs("back");
         } else if (action == "play_pause") {
           _log("🎵 Reloj ➔ Play/Pausa");
           _triggerFlash(Colors.purpleAccent, "⏯️ PLAY/PAUSA");
+          _triggerHaptic("play_pause");
         }
       }
     });
@@ -531,6 +551,102 @@ class _PresenterScreenState extends State<PresenterScreen> {
     }
   }
 
+  void _triggerHaptic(String action) {
+    if (!_hapticEnabled) return;
+    try {
+      if (action == "forward") {
+        HapticFeedback.mediumImpact();
+      } else if (action == "back") {
+        HapticFeedback.lightImpact();
+        Future.delayed(const Duration(milliseconds: 110), () {
+          HapticFeedback.lightImpact();
+        });
+      } else if (action == "play_pause") {
+        HapticFeedback.heavyImpact();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _startDiscovery({bool manual = false}) async {
+    if (_isDiscovering) return;
+    if (_isWsConnected && !manual) return;
+
+    setState(() => _isDiscovering = true);
+    if (manual) _log("🔍 Buscando laptop en la red local...");
+
+    try {
+      _discoverySocket?.close();
+      _discoverySocket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0);
+      _discoverySocket!.broadcastEnabled = true;
+
+      _discoverySocket!.listen((RawSocketEvent event) {
+        if (event == RawSocketEvent.read) {
+          final datagram = _discoverySocket?.receive();
+          if (datagram != null) {
+            try {
+              final text = utf8.decode(datagram.data);
+              final data = jsonDecode(text) as Map<String, dynamic>;
+              if (data['service'] == 'smartwatch-presenter') {
+                final ip = data['ip']?.toString() ?? datagram.address.address;
+                final port = data['port']?.toString() ?? "8888";
+                final target = "$ip:$port";
+
+                if (mounted) {
+                  setState(() {
+                    _pcController.text = target;
+                    _isDiscovering = false;
+                  });
+                }
+                _log("✓ ¡Laptop detectada!: $target");
+                _discoveryTimeoutTimer?.cancel();
+                _discoverySocket?.close();
+                _discoverySocket = null;
+
+                if (!_isWsConnected) {
+                  _connectWebSocket();
+                }
+              }
+            } catch (_) {}
+          }
+        }
+      });
+
+      // Enviar solicitud de broadcast a 255.255.255.255:8889
+      final probe = utf8.encode("DISCOVER_SMARTWATCH_PRESENTER");
+      _discoverySocket!.send(probe, InternetAddress("255.255.255.255"), 8889);
+
+      // Reintento rápido a los 800ms
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (_isDiscovering && _discoverySocket != null) {
+          try {
+            _discoverySocket!.send(probe, InternetAddress("255.255.255.255"), 8889);
+          } catch (_) {}
+        }
+      });
+
+      _discoveryTimeoutTimer?.cancel();
+      _discoveryTimeoutTimer = Timer(const Duration(seconds: 4), () {
+        if (mounted && _isDiscovering) {
+          setState(() => _isDiscovering = false);
+          _discoverySocket?.close();
+          _discoverySocket = null;
+          if (manual) {
+            _log("[!] No se detectó laptop en Wi-Fi. Puedes usar la IP manual.");
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("No se encontró la laptop. Verifica que web_bridge esté corriendo en la misma red Wi-Fi."),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+        }
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isDiscovering = false);
+      if (manual) _log("[!] Error en auto-descubrimiento: $e");
+    }
+  }
+
   void _connectWebSocket() {
     _wsReconnectTimer?.cancel();
     final target = _pcController.text.trim();
@@ -566,8 +682,10 @@ class _PresenterScreenState extends State<PresenterScreen> {
             final data = jsonDecode(message.toString());
             if (data['action'] == 'forward') {
               _triggerFlash(Colors.green, "⏩ AVANZAR (Diapositiva)");
+              _triggerHaptic("forward");
             } else if (data['action'] == 'back') {
               _triggerFlash(Colors.blue, "⏪ RETROCEDER (Diapositiva)");
+              _triggerHaptic("back");
             }
           } catch (_) {}
         },
@@ -889,14 +1007,13 @@ class _PresenterScreenState extends State<PresenterScreen> {
       if (seq != -1 && seq == _lastSequence) return;
       _lastSequence = seq;
 
-      HapticFeedback.heavyImpact();
+      _triggerHaptic("forward");
       _log("🎯 Disparo detectado (Seq: $seq) ➜ Enviando a PC");
       _sendWs("shutter", sequence: seq);
     }
   }
 
   void _triggerFlash(Color color, String text) {
-    HapticFeedback.lightImpact();
     setState(() {
       _flashColor = color.withValues(alpha: 0.25);
       _lastActionText = text;
@@ -908,6 +1025,8 @@ class _PresenterScreenState extends State<PresenterScreen> {
 
   @override
   void dispose() {
+    _discoveryTimeoutTimer?.cancel();
+    _discoverySocket?.close();
     _scanSub?.cancel();
     _valueSub?.cancel();
     _stateSub?.cancel();
@@ -1031,6 +1150,14 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     ),
                   ),
                   IconButton(
+                    icon: Icon(
+                      Icons.radar,
+                      color: _isDiscovering ? Colors.amber : const Color(0xFF38BDF8),
+                    ),
+                    tooltip: 'Auto-detectar Laptop en Wi-Fi',
+                    onPressed: () => _startDiscovery(manual: true),
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.sync, color: Color(0xFF38BDF8)),
                     tooltip: 'Reconectar WebSocket',
                     onPressed: _connectWebSocket,
@@ -1104,7 +1231,50 @@ class _PresenterScreenState extends State<PresenterScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
+
+            // Tarjeta de Feedback Háptico (Vibración en Bolsillo)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _hapticEnabled ? const Color(0xFF38BDF8).withValues(alpha: 0.3) : Colors.white10,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _hapticEnabled ? Icons.vibration : Icons.mobile_off,
+                    color: _hapticEnabled ? const Color(0xFF38BDF8) : Colors.white38,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("Vibración Háptica (Bolsillo)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text(
+                          _hapticEnabled ? "1 vib = ⏩ Avanzar | 2 vibs = ⏪ Retroceder" : "Vibración táctil desactivada",
+                          style: TextStyle(color: _hapticEnabled ? const Color(0xFF38BDF8) : Colors.white38, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _hapticEnabled,
+                    activeTrackColor: const Color(0xFF38BDF8),
+                    onChanged: (val) {
+                      setState(() => _hapticEnabled = val);
+                      if (val) HapticFeedback.mediumImpact();
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
 
             // Dispositivos encontrados (si no está conectado el reloj)
             if (!_isBleConnected && _discoveredMap.isNotEmpty) ...[

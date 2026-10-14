@@ -230,6 +230,55 @@ class BridgeServer:
         return web.Response(text="APK no encontrado", status=404)
 
 
+class DiscoveryProtocol(asyncio.DatagramProtocol):
+    def __init__(self, local_ip, port=8888, http_port=8080):
+        self.local_ip = local_ip
+        self.port = port
+        self.http_port = http_port
+        self.transport = None
+
+    def connection_made(self, transport):
+        self.transport = transport
+        sock = transport.get_extra_info("socket")
+        if sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+    def datagram_received(self, data, addr):
+        try:
+            msg = data.decode("utf-8", errors="ignore").strip()
+            if "DISCOVER" in msg or "SMARTWATCH" in msg or "PRESENTER" in msg:
+                info = get_app_version_info()
+                response = json.dumps({
+                    "service": "smartwatch-presenter",
+                    "ip": self.local_ip,
+                    "port": self.port,
+                    "http_port": self.http_port,
+                    "version": info.get("version", "1.0.0"),
+                    "name": socket.gethostname(),
+                }).encode("utf-8")
+                self.transport.sendto(response, addr)
+        except Exception:
+            pass
+
+
+async def broadcast_beacon(transport, local_ip, port=8888, http_port=8080):
+    while True:
+        try:
+            info = get_app_version_info()
+            beacon = json.dumps({
+                "service": "smartwatch-presenter",
+                "ip": local_ip,
+                "port": port,
+                "http_port": http_port,
+                "version": info.get("version", "1.0.0"),
+                "name": socket.gethostname(),
+            }).encode("utf-8")
+            transport.sendto(beacon, ("255.255.255.255", 8889))
+        except Exception:
+            pass
+        await asyncio.sleep(3)
+
+
 async def main():
     bridge = BridgeServer()
     app = web.Application()
@@ -258,6 +307,15 @@ async def main():
         await site_https.start()
 
     local_ip = get_local_ip()
+
+    # 3. Servidor de Auto-descubrimiento UDP (Puerto 8889)
+    loop = asyncio.get_running_loop()
+    udp_transport, _ = await loop.create_datagram_endpoint(
+        lambda: DiscoveryProtocol(local_ip, 8888, 8080),
+        local_addr=("0.0.0.0", 8889),
+        allow_broadcast=True,
+    )
+    beacon_task = asyncio.create_task(broadcast_beacon(udp_transport, local_ip, 8888, 8080))
     info = get_app_version_info()
     print("\n" + "=" * 70)
     print("  PUENTE WEB BLUETOOTH ACTIVO (SMARTWATCH ➔ TELÉFONO ➔ PC)")
@@ -287,6 +345,11 @@ async def main():
     except (asyncio.CancelledError, KeyboardInterrupt):
         pass
     finally:
+        try:
+            beacon_task.cancel()
+            udp_transport.close()
+        except Exception:
+            pass
         await runner.cleanup()
 
 

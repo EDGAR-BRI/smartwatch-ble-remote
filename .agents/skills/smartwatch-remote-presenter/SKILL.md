@@ -110,10 +110,14 @@ Para evitar que Android cierre la aplicación cuando el usuario bloquea el telé
 - **Lógica de Doble Toque:**
   - Si el usuario presiona el obturador 1 vez: espera 450 ms; si no hay otro toque, emite `KEY_RIGHT`.
   - Si pulsa 2 veces antes de 450 ms: cancela el avance y emite `KEY_LEFT`.
+- **Auto-descubrimiento Local UDP (Zero Configuración):**
+  - Puerto `8889` UDP broadcast.
+  - La laptop responde a sondeos `"DISCOVER_SMARTWATCH_PRESENTER"` y además emite un beacon cada 3 segundos a `255.255.255.255:8889` con JSON (`ip`, `port`, `http_port`, `version`, `hostname`).
+  - La app móvil (`RawDatagramSocket`) escucha en el puerto UDP y auto-rellena la IP y se conecta automáticamente sin que el usuario deba consultar la terminal.
 
 ---
 
-## 5. Actualizador In-App (OTA) de APK
+## 5. Actualizador In-App (OTA) de APK y Limpieza de Caché
 
 Permite actualizar la app móvil sin necesidad de ingresar al navegador web:
 1. **Servidor:** Expone `GET /api/app-info` (obtiene versión de `pubspec.yaml`, tamaño y timestamp del APK compilado) y `GET /app.apk`.
@@ -121,6 +125,7 @@ Permite actualizar la app móvil sin necesidad de ingresar al navegador web:
    - Comprueba versión al conectar por WebSocket y mediante botón de búsqueda en el AppBar.
    - Si hay actualización: descarga el archivo usando `HttpClient` directamente al `cacheDir`.
    - Diálogo de progreso en MB y porcentaje.
+   - **Limpieza de Caché:** Al iniciar la app tras la actualización, si existe un archivo `update.apk` en caché (aprox. 50 MB), se elimina automáticamente para no malgastar espacio en disco.
 3. **Instalación Segura en Android (FileProvider):**
    - Requiere `REQUEST_INSTALL_PACKAGES` en el Manifest.
    - `<paths>` en `res/xml/file_paths.xml` con `<cache-path name="cache" path="." />`.
@@ -128,7 +133,17 @@ Permite actualizar la app móvil sin necesidad de ingresar al navegador web:
 
 ---
 
-## 6. Procedimientos de Operación y Comandos Frecuentes
+## 6. Feedback Háptico para el Bolsillo
+
+Para que el orador tenga confirmación táctil con el teléfono en el bolsillo sin mirar la pantalla de proyección:
+- **Avanzar Diapositiva (⏩):** 1 pulso de vibración medio (`HapticFeedback.mediumImpact()`).
+- **Retroceder Diapositiva (⏪):** 2 pulsos consecutivos separados por 110 ms.
+- **Play / Pausa (⏯️):** 1 pulso pesado prolongado (`HapticFeedback.heavyImpact()`).
+- **Configurable:** Interruptor en la interfaz móvil para activar o silenciar las vibraciones según la preferencia del usuario.
+
+---
+
+## 7. Procedimientos de Operación y Comandos Frecuentes
 
 ### Iniciar el Puente en la PC
 ```bash
@@ -139,7 +154,7 @@ cd /home/edgar/dev/projets/smartwatch_remote
 ### Compilar Nueva Versión de la App Móvil
 ```bash
 cd /home/edgar/dev/projets/smartwatch_remote/mobile_app
-# 1. Incrementar versión en pubspec.yaml (ej: 1.0.6+7)
+# 1. Incrementar versión en pubspec.yaml (ej: 1.0.7+8)
 # 2. Compilar APK release
 flutter build apk --release
 ```
@@ -155,6 +170,6 @@ curl -k -I https://127.0.0.1:8888/app.apk
 
 ---
 
-## 7. Referencias y Documentación Detallada
+## 8. Referencias y Documentación Detallada
 - Para arquitectura y flujos de red: [architecture.md](./references/architecture.md)
 - Para solución de problemas y errores comunes: [troubleshooting.md](./references/troubleshooting.md)

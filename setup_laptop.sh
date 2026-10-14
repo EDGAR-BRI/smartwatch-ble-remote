@@ -108,10 +108,11 @@ echo -e "\n${BOLD}[5/6] Verificando Cortafuegos (Firewall)...${NC}"
 if command -v ufw &>/dev/null; then
     UFW_STATUS=$(sudo -n ufw status 2>/dev/null | head -n 1 || true)
     if [[ "$UFW_STATUS" =~ "active" ]]; then
-        echo -e "UFW está activo. Asegurando puertos 8888 y 8080..."
+        echo -e "UFW está activo. Asegurando puertos 8888, 8080 y 8889 (UDP)..."
         sudo ufw allow 8888/tcp comment 'Smartwatch Presenter WSS' &>/dev/null || true
         sudo ufw allow 8080/tcp comment 'Smartwatch Presenter HTTP' &>/dev/null || true
-        echo -e "${GREEN}✓ Puertos 8888 y 8080 permitidos en UFW.${NC}"
+        sudo ufw allow 8889/udp comment 'Smartwatch Presenter Discovery' &>/dev/null || true
+        echo -e "${GREEN}✓ Puertos 8888, 8080 y 8889 (UDP) permitidos en UFW.${NC}"
     else
         echo -e "${GREEN}✓ Firewall sin bloqueos en la red local.${NC}"
     fi

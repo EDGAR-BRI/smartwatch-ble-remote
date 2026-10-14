@@ -8,6 +8,7 @@ import asyncio
 import datetime
 import json
 import os
+import socket
 import ssl
 import sys
 import time
@@ -51,6 +52,17 @@ class VirtualClicker:
 
     def back(self):
         self.emit(self.code_back)
+
+
+def get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(('8.8.8.8', 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return '127.0.0.1'
 
 
 def get_app_version_info():
@@ -245,26 +257,28 @@ async def main():
         site_https = web.TCPSite(runner, "0.0.0.0", 8888, ssl_context=ssl_context)
         await site_https.start()
 
+    local_ip = get_local_ip()
     info = get_app_version_info()
     print("\n" + "=" * 70)
     print("  PUENTE WEB BLUETOOTH ACTIVO (SMARTWATCH ➔ TELÉFONO ➔ PC)")
     print("=" * 70)
     print(f"  📦 Versión App Android: v{info['version']} ({info['size_mb']})")
     print(f"  🕒 Compilación: {info['build_time']}")
+    print(f"  🌐 IP detectada en tu red actual: {local_ip}")
     print("-" * 70)
     print("Elige cualquiera de las dos formas de abrirlo en tu celular:")
     print("")
-    print("▶ MÉTODO A (Por Wi-Fi sin cables - Puerto 8888 libre de firewall):")
-    print("  En Google Chrome en tu teléfono, entra a:")
-    print("  👉 https://10.0.0.3:8888")
-    print("  (Acepta la advertencia de certificado autofirmado: 'Avanzado' ➔ 'Acceder').")
+    print("▶ MÉTODO A (Por Wi-Fi sin cables):")
+    print("  1. En Google Chrome de tu teléfono para descargar la app o usar web:")
+    print(f"     👉 https://{local_ip}:8888")
+    print("  2. En la App Android 'Smartwatch Presenter':")
+    print(f"     Escribe en el campo de IP: {local_ip}:8888 y pulsa 🔄")
     print("")
-    print("▶ MÉTODO B (Por cable USB / ADB sin advertencias):")
+    print("▶ MÉTODO B (Por cable USB / ADB sin depender de Wi-Fi):")
     print("  1. Conecta el teléfono por USB con 'Depuración USB' activa.")
     print("  2. En tu terminal corre: adb reverse tcp:8080 tcp:8080")
-    print("  3. En Chrome de tu celular abre: http://localhost:8080")
+    print("  3. En la app o navegador usa: localhost:8080")
     print("=" * 70)
-    print("[*] Presiona 'Conectar Smartwatch' en la página de tu celular.")
     print("[*] Presiona Ctrl+C para detener el servidor.\n")
 
     try:

@@ -66,17 +66,16 @@ Permite usar los botones físicos o de pantalla del reloj (Siguiente ⏭️, Ant
 
 ### Modo C: Corona Digital / Rueda de Volumen
 Permite avanzar o retroceder diapositivas girando la rueda física o corona del reloj inteligente:
-- En lugar de modificar el volumen de medios del teléfono, se utiliza:
-  ```kotlin
-  val volumeProvider = object : VolumeProvider(VOLUME_CONTROL_RELATIVE, 100, 50) {
-      override fun onAdjustVolume(direction: Int) {
-          if (direction > 0) dispatchMediaAction("forward")
-          else if (direction < 0) dispatchMediaAction("back")
-      }
-  }
-  mediaSession.setPlaybackToRemote(volumeProvider)
-  ```
-- **Debounce:** Aplicar un umbral de tiempo (140 ms) entre giros para evitar saltar varias diapositivas con giros rápidos.
+- **Problema de Bluetooth Absolute Volume:** En Android moderno con Bluetooth Classic, el stack Bluetooth maneja el volumen absoluto modificando directamente `STREAM_MUSIC`, ignorando `VolumeProvider` de `MediaSession`. Además, `dispatchKeyEvent` filtraba `ACTION_UP`, provocando que el volumen del teléfono subiera y bajara en pantalla hasta saturarse (al 100% o 0%).
+- **Solución Multicapa Robusta:**
+  1. **Consumo de Eventos de Tecla:** En `dispatchKeyEvent`, interceptar y retornar `true` tanto para `ACTION_DOWN` como para `ACTION_UP` en `KEYCODE_VOLUME_UP` y `KEYCODE_VOLUME_DOWN`, anulando la ventana emergente de volumen en primer plano.
+  2. **Receptor Dinámico + ContentObserver:** Registrar `BroadcastReceiver` para `android.media.VOLUME_CHANGED_ACTION` y `ContentObserver` sobre `Settings.System.CONTENT_URI` para capturar cualquier ajuste de volumen proveniente del Bluetooth AVRCP del reloj (pantalla encendida o apagada).
+  3. **Bloqueo a Punto Neutro (Baseline Volume Lock):**
+     - Al iniciar la sesión, se fija el volumen de medios en un punto medio neutral (`baselineVolume = maxVol / 2`, ej: 7).
+     - Si el reloj gira en sentido horario: el volumen sube a 8 (`> 7`). Se dispara `forward` (avanzar) y se restablece instantáneamente a 7 con flag `0` (sin UI ni sonido).
+     - Si el reloj gira en sentido antihorario: el volumen baja a 6 (`< 7`). Se dispara `back` (retroceder) y se restablece instantáneamente a 7.
+     - De esta forma, el usuario puede girar la rueda infinitamente sin que el volumen del teléfono se sature al 100% ni se quede en 0%. Al salir, se restaura el volumen original del usuario.
+- **Debounce:** Umbral de tiempo (140 ms) entre giros para evitar saltos dobles accidentales.
 
 ---
 

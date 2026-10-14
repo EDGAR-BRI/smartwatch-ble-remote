@@ -1,0 +1,32 @@
+{
+  "name": "smartwatch-remote-presenter",
+  "version": "1.0.6",
+  "description": "Control de diapositivas en Linux con Smartwatch vía BLE, AVRCP y uinput",
+  "main": "web_bridge.py",
+  "scripts": {
+    "start": "./venv/bin/python web_bridge.py",
+    "dev": "./venv/bin/python web_bridge.py",
+    "bridge": "./venv/bin/python web_bridge.py",
+    "setup": "bash ./setup_laptop.sh",
+    "install:laptop": "bash ./setup_laptop.sh",
+    "stop": "pkill -f web_bridge.py || true",
+    "status": "curl -k -s https://127.0.0.1:8888/api/app-info || echo 'Servidor no activo'",
+    "scanner": "./venv/bin/python scanner.py -s",
+    "sniffer": "./venv/bin/python sniffer.py",
+    "clicker": "./venv/bin/python remote_clicker.py",
+    "build:apk": "cd mobile_app && flutter build apk --release",
+    "analyze:app": "cd mobile_app && flutter analyze"
+  },
+  "keywords": [
+    "smartwatch",
+    "remote-clicker",
+    "ble",
+    "avrcp",
+    "uinput",
+    "slides",
+    "canva",
+    "linux"
+  ],
+  "author": "Edgar Dev",
+  "license": "MIT"
+}

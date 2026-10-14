@@ -47,6 +47,17 @@ cd smartwatch-ble-remote
 
 📖 **Consulta la [Guía Completa de Onboarding (ONBOARDING.md)](ONBOARDING.md)** para instrucciones paso a paso, alias para tu terminal y configuración de servicio en segundo plano.
 
+### 📦 Atajos Rápidos con NPM (`package.json`)
+
+| Comando | Acción |
+| :--- | :--- |
+| `npm start` | Inicia el servidor puente de diapositivas (`web_bridge.py`) |
+| `npm run status` | Verifica el estado del servidor y del APK compilado |
+| `npm run stop` | Detiene el servidor en segundo plano si quedó abierto |
+| `npm run setup` | Ejecuta el script de onboarding/permisos en tu laptop |
+| `npm run build:apk` | Compila un nuevo APK de release en Flutter |
+| `npm run scanner` | Escanea y detecta la MAC de tu smartwatch BLE |
+
 ---
 
 ## 🚀 Instalación Manual y Requisitos

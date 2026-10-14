@@ -53,6 +53,62 @@ class VirtualClicker:
         self.emit(self.code_back)
 
 
+def get_app_version_info():
+    base_dir = os.path.dirname(__file__)
+    pubspec_path = os.path.join(base_dir, "mobile_app", "pubspec.yaml")
+    apk_path = os.path.join(
+        base_dir, "mobile_app", "build", "app", "outputs", "flutter-apk", "app-release.apk"
+    )
+
+    version = "1.0.1+2"
+    version_name = "1.0.1"
+    build_number = "2"
+    if os.path.exists(pubspec_path):
+        try:
+            with open(pubspec_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped.startswith("version:"):
+                        v_part = stripped.split("version:")[1].strip()
+                        version = v_part
+                        if "+" in v_part:
+                            parts = v_part.split("+")
+                            version_name = parts[0]
+                            build_number = parts[1]
+                        else:
+                            version_name = v_part
+                            build_number = ""
+                        break
+        except Exception:
+            pass
+
+    apk_exists = os.path.exists(apk_path)
+    size_mb = "--"
+    build_time = "No disponible"
+    mtime = 0
+
+    if apk_exists:
+        try:
+            stat = os.stat(apk_path)
+            size_mb = f"{stat.st_size / (1024 * 1024):.1f} MB"
+            mtime_dt = datetime.datetime.fromtimestamp(stat.st_mtime)
+            build_time = mtime_dt.strftime("%d/%m/%Y %H:%M:%S")
+            mtime = stat.st_mtime
+        except Exception:
+            pass
+
+    return {
+        "version": version,
+        "version_name": version_name,
+        "build_number": build_number,
+        "apk_exists": apk_exists,
+        "size_mb": size_mb,
+        "build_time": build_time,
+        "mtime": mtime,
+        "filename": f"SmartwatchPresenter-v{version_name}.apk",
+    }
+
+
 class BridgeServer:
     def __init__(self, double_tap_ms=450):
         self.clicker = VirtualClicker()
@@ -140,14 +196,24 @@ class BridgeServer:
             self.pending_forward_task = asyncio.create_task(delayed_forward())
 
 
+    async def handle_app_info(self, request):
+        info = get_app_version_info()
+        return web.json_response(info)
+
     async def handle_download(self, request):
+        info = get_app_version_info()
         apk_path = os.path.join(
             os.path.dirname(__file__),
             "mobile_app", "build", "app", "outputs", "flutter-apk", "app-release.apk"
         )
         if os.path.exists(apk_path):
+            filename = info["filename"]
             return web.FileResponse(apk_path, headers={
-                "Content-Disposition": 'attachment; filename="SmartwatchPresenter.apk"'
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-App-Version": info["version"],
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
             })
         return web.Response(text="APK no encontrado", status=404)
 
@@ -159,6 +225,8 @@ async def main():
     app.router.add_get("/ws", bridge.handle_ws)
     app.router.add_get("/app.apk", bridge.handle_download)
     app.router.add_get("/download", bridge.handle_download)
+    app.router.add_get("/api/app-info", bridge.handle_app_info)
+    app.router.add_get("/version", bridge.handle_app_info)
 
     runner = web.AppRunner(app)
     await runner.setup()
@@ -177,9 +245,13 @@ async def main():
         site_https = web.TCPSite(runner, "0.0.0.0", 8888, ssl_context=ssl_context)
         await site_https.start()
 
+    info = get_app_version_info()
     print("\n" + "=" * 70)
     print("  PUENTE WEB BLUETOOTH ACTIVO (SMARTWATCH ➔ TELÉFONO ➔ PC)")
     print("=" * 70)
+    print(f"  📦 Versión App Android: v{info['version']} ({info['size_mb']})")
+    print(f"  🕒 Compilación: {info['build_time']}")
+    print("-" * 70)
     print("Elige cualquiera de las dos formas de abrirlo en tu celular:")
     print("")
     print("▶ MÉTODO A (Por Wi-Fi sin cables - Puerto 8888 libre de firewall):")

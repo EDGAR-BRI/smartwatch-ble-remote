@@ -178,8 +178,14 @@
             <button id="btnConnect" class="btn-connect">
                 <span>🔗 Conectar Smartwatch</span>
             </button>
-            <a href="/app.apk" download style="display: block; text-decoration: none; text-align: center; margin-top: 12px; padding: 12px; background: rgba(56, 189, 248, 0.12); color: var(--accent); border-radius: 12px; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 0.95rem;">
-                📥 Descargar App Android Nativa (APK)
+            <a href="/app.apk" download style="display: block; text-decoration: none; text-align: center; margin-top: 14px; padding: 14px; background: rgba(56, 189, 248, 0.12); color: var(--accent); border-radius: 14px; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.35); font-size: 0.95rem; transition: background 0.2s;">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <span>📥 Descargar App Android (APK)</span>
+                    <span id="apkVersionTag" style="background: rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 0.75rem; padding: 2px 8px; border-radius: 8px; font-family: monospace; font-weight: bold;">v1.0.1+2</span>
+                </div>
+                <div id="apkMetaDetails" style="font-size: 0.75rem; color: #94a3b8; font-weight: normal; margin-top: 5px;">
+                    Cargando estado del APK...
+                </div>
             </a>
         </div>
     </div>
@@ -403,6 +409,31 @@
         document.getElementById('btnManualBack').addEventListener('click', () => sendEvent('back'));
 
         connectWebSocket();
+
+        async function updateApkInfo() {
+            try {
+                const res = await fetch('/api/app-info');
+                if (res.ok) {
+                    const info = await res.json();
+                    const tag = document.getElementById('apkVersionTag');
+                    const meta = document.getElementById('apkMetaDetails');
+                    if (tag && info.version) {
+                        tag.textContent = `v${info.version}`;
+                    }
+                    if (meta) {
+                        if (info.apk_exists) {
+                            meta.innerHTML = `📦 ${info.size_mb} • 🕒 Compilado: <b style="color: #cbd5e1;">${info.build_time}</b>`;
+                        } else {
+                            meta.innerHTML = `<span style="color: #ef4444;">⚠️ APK aún no compilado</span>`;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('No se pudo consultar información del APK:', e);
+            }
+        }
+        updateApkInfo();
+        setInterval(updateApkInfo, 10000);
     </script>
 </body>
 </html>

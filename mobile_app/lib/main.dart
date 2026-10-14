@@ -23,7 +23,7 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.9+10";
+const String appVersion = "1.0.10+11";
 const String githubLatestApkUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/SmartwatchPresenter.apk";
 const String githubLatestReleaseUrl = "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
@@ -85,6 +85,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
   bool _isCheckingUpdate = false;
   bool _hapticEnabled = true;
   bool _isDiscovering = false;
+  bool _showSplash = true;
   RawDatagramSocket? _discoverySocket;
   Timer? _discoveryTimeoutTimer;
   int? _lastSequence;
@@ -101,6 +102,10 @@ class _PresenterScreenState extends State<PresenterScreen> {
   }
 
   Future<void> _initApp() async {
+    Future.delayed(const Duration(milliseconds: 1800), () {
+      if (mounted) setState(() => _showSplash = false);
+    });
+
     try {
       await WakelockPlus.enable();
     } catch (_) {}
@@ -1053,19 +1058,249 @@ class _PresenterScreenState extends State<PresenterScreen> {
     super.dispose();
   }
 
+  Widget _buildMascotCard() {
+    String mascotMessage;
+    Color accentColor;
+    IconData statusIcon;
+    String badgeText;
+
+    if (_isBleConnected && _isWsConnected) {
+      mascotMessage = "¡Todo listo! Reloj y laptop sincronizados. Pasa diapositivas con toques o girando la corona.";
+      accentColor = const Color(0xFF22C55E);
+      statusIcon = Icons.check_circle;
+      badgeText = "CONECTADO";
+    } else if (_isBleConnected && !_isWsConnected) {
+      mascotMessage = "¡Smartwatch enlazado! Toca 📡 para auto-detectar tu laptop en la red Wi-Fi.";
+      accentColor = const Color(0xFF38BDF8);
+      statusIcon = Icons.wifi_find;
+      badgeText = "ENLACE BLE";
+    } else if (!_isBleConnected && _isWsConnected) {
+      mascotMessage = "¡Laptop conectada! Pulsa 'Escanear' o activa la música para vincular tu smartwatch.";
+      accentColor = Colors.amber;
+      statusIcon = Icons.bluetooth_searching;
+      badgeText = "BUSCANDO BLE";
+    } else {
+      mascotMessage = "¡Hola! Soy Sparky, tu copiloto de diapositivas. Conecta tu laptop y smartwatch para empezar.";
+      accentColor = const Color(0xFF38BDF8);
+      statusIcon = Icons.smart_toy;
+      badgeText = "ASISTENTE";
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accentColor.withValues(alpha: 0.35), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ScaffoldMessenger.of(context).removeCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("🤖 Sparky: '¡A romperla en la presentación! 1 toque = Avanzar | 2 = Retroceder'"),
+                duration: Duration(seconds: 2),
+                backgroundColor: Color(0xFF1E293B),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Stack(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: accentColor, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accentColor.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/images/mascot.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF0F172A),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(statusIcon, size: 14, color: accentColor),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            "Sparky",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: accentColor.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              badgeText,
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: accentColor,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        mascotMessage,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white70,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_showSplash) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF090D16),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF38BDF8).withValues(alpha: 0.3),
+                      blurRadius: 40,
+                      spreadRadius: 6,
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: Image.asset(
+                    'assets/images/mascot.png',
+                    width: 130,
+                    height: 130,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Smartwatch Presenter',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Tu muñeca tiene el control',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF38BDF8),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 32),
+              const SizedBox(
+                width: 120,
+                child: LinearProgressIndicator(
+                  minHeight: 3,
+                  backgroundColor: Colors.white10,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Iniciando enlaces...',
+                style: TextStyle(color: Colors.white38, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12.0, top: 10.0, bottom: 10.0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              'assets/images/app_logo.png',
+              fit: BoxFit.cover,
+            ),
+          ),
+        ),
         title: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Smartwatch Presenter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+            const Text('Smartwatch Presenter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             Text('v$appVersion • Rueda + Música + BLE', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.normal)),
           ],
         ),
         backgroundColor: const Color(0xFF1E293B),
-        centerTitle: true,
+        centerTitle: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.system_update_alt, color: Color(0xFF38BDF8)),
@@ -1141,6 +1376,9 @@ class _PresenterScreenState extends State<PresenterScreen> {
                   ],
                 ),
               ),
+
+            // Tarjeta Asistente Sparky (Mascota)
+            _buildMascotCard(),
 
             // Configuración IP PC
             Container(

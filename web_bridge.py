@@ -302,6 +302,7 @@ async def main():
     bridge = BridgeServer()
     app = web.Application()
     app.router.add_get("/", bridge.handle_index)
+    app.router.add_static("/static", os.path.join(os.path.dirname(__file__), "static"))
     app.router.add_get("/ws", bridge.handle_ws)
     app.router.add_get("/app.apk", bridge.handle_download)
     app.router.add_get("/download", bridge.handle_download)

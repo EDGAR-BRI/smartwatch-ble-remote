@@ -23,8 +23,9 @@ const String targetMac = "41:42:2E:78:9B:68";
 const String nusServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusWriteCharUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9f";
 const String nusNotifyCharUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9f";
-const String appVersion = "1.0.1+2";
+const String appVersion = "1.0.2+3";
 const String battCharUuid = "00002a19-0000-1000-8000-00805f9b34fb";
+const MethodChannel _mediaChannel = MethodChannel('com.edgardev.mobile_app/media_session');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -75,6 +76,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
   bool _isBleConnected = false;
   bool _isWsConnected = false;
   bool _isScanning = false;
+  bool _isMediaActive = false;
   bool _bluetoothEnabled = true;
   bool _permissionsGranted = false;
   int? _lastSequence;
@@ -98,8 +100,53 @@ class _PresenterScreenState extends State<PresenterScreen> {
     await _requestPermissions();
     _listenAdapterState();
     _connectWebSocket();
+    _setupMediaSession();
     if (_permissionsGranted) {
       _startScan();
+    }
+  }
+
+  Future<void> _setupMediaSession() async {
+    _mediaChannel.setMethodCallHandler((call) async {
+      if (call.method == "onMediaAction") {
+        final action = call.arguments?.toString() ?? "";
+        if (action == "forward") {
+          _log("🎵 Reloj ➔ Siguiente (AVRCP) ➔ Avanzar");
+          _triggerFlash(const Color(0xFF22C55E), "⏩ AVANZAR (Reloj)");
+          _sendWs("forward");
+        } else if (action == "back") {
+          _log("🎵 Reloj ➔ Anterior (AVRCP) ➔ Retroceder");
+          _triggerFlash(const Color(0xFF38BDF8), "⏪ RETROCEDER (Reloj)");
+          _sendWs("back");
+        } else if (action == "play_pause") {
+          _log("🎵 Reloj ➔ Play/Pausa (AVRCP)");
+          _triggerFlash(Colors.purpleAccent, "⏯️ PLAY/PAUSA (Reloj)");
+        }
+      }
+    });
+
+    try {
+      await _mediaChannel.invokeMethod('startMediaSession');
+      if (mounted) setState(() => _isMediaActive = true);
+      _log("✓ Simulador AVRCP activo (Controles Música)");
+    } catch (e) {
+      _log("[!] Error iniciando AVRCP: $e");
+    }
+  }
+
+  Future<void> _toggleMediaSession(bool enable) async {
+    try {
+      if (enable) {
+        await _mediaChannel.invokeMethod('startMediaSession');
+        if (mounted) setState(() => _isMediaActive = true);
+        _log("✓ Controles de música (AVRCP) activados");
+      } else {
+        await _mediaChannel.invokeMethod('stopMediaSession');
+        if (mounted) setState(() => _isMediaActive = false);
+        _log("[-] Controles de música desactivados");
+      }
+    } catch (e) {
+      _log("[!] Error alternando AVRCP: $e");
     }
   }
 
@@ -537,6 +584,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
     _heartbeatTimer?.cancel();
     _channel?.sink.close();
     _device?.disconnect();
+    _mediaChannel.invokeMethod('stopMediaSession').catchError((_) {});
     super.dispose();
   }
 
@@ -548,7 +596,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Smartwatch Presenter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-            Text('v$appVersion • BLE Resilient', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.normal)),
+            Text('v$appVersion • AVRCP Música + BLE', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.normal)),
           ],
         ),
         backgroundColor: const Color(0xFF1E293B),
@@ -645,6 +693,46 @@ class _PresenterScreenState extends State<PresenterScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+
+            // Tarjeta de Controles Multimedia AVRCP
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _isMediaActive ? const Color(0xFF22C55E).withValues(alpha: 0.4) : Colors.white10,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isMediaActive ? Icons.music_note : Icons.music_off,
+                    color: _isMediaActive ? const Color(0xFF22C55E) : Colors.white38,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text("Controles de Música (Reloj)", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        Text(
+                          _isMediaActive ? "Capturando ⏭️ Siguiente y ⏮️ Anterior" : "Simulador desactivado",
+                          style: TextStyle(color: _isMediaActive ? const Color(0xFF22C55E) : Colors.white38, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _isMediaActive,
+                    activeTrackColor: const Color(0xFF22C55E),
+                    onChanged: _toggleMediaSession,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 14),
 

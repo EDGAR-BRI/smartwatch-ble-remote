@@ -83,9 +83,9 @@ def get_app_version_info():
         base_dir, "mobile_app", "build", "app", "outputs", "flutter-apk", "app-release.apk"
     )
 
-    version = "1.1.0+14"
-    version_name = "1.1.0"
-    build_number = "14"
+    version = "1.1.1+15"
+    version_name = "1.1.1"
+    build_number = "15"
     if os.path.exists(pubspec_path):
         try:
             with open(pubspec_path, "r", encoding="utf-8") as f:

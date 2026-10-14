@@ -21,7 +21,7 @@ class DevHttpOverrides extends HttpOverrides {
 }
 
 const String defaultPcUrl = "10.0.0.3:8888";
-const String appVersion = "1.1.1+15";
+const String appVersion = "1.1.2+16";
 const String githubLatestApkUrl =
     "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/BTPresenter.apk";
 const String githubLatestReleaseUrl =
@@ -85,6 +85,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
   String _lastActionIcon = Ri.slideshow_line;
   Color _lastActionColor = const Color(0xFF38BDF8);
   Color _flashColor = Colors.transparent;
+  int _lastActionTimestamp = 0;
   final List<String> _logs = [];
 
   @override
@@ -796,13 +797,16 @@ class _PresenterScreenState extends State<PresenterScreen> {
             final data = jsonDecode(message.toString());
             if (data['action'] == 'forward') {
               _triggerAction("forward", "Siguiente Diapositiva",
-                  "Avanzar presentación", const Color(0xFF38BDF8), Ri.skip_forward_fill);
+                  "Recibido de la laptop", const Color(0xFF38BDF8), Ri.skip_forward_fill,
+                  sendWs: false);
             } else if (data['action'] == 'back') {
               _triggerAction("back", "Diapositiva Anterior",
-                  "Retroceder presentación", const Color(0xFFF43F5E), Ri.skip_back_fill);
+                  "Recibido de la laptop", const Color(0xFFF43F5E), Ri.skip_back_fill,
+                  sendWs: false);
             } else if (data['action'] == 'play_pause') {
               _triggerAction("play_pause", "Telón Negro",
-                  "Ocultar diapositiva", const Color(0xFFA855F7), Ri.pause_circle_fill);
+                  "Recibido de la laptop", const Color(0xFFA855F7), Ri.pause_circle_fill,
+                  sendWs: false);
             }
           } catch (_) {}
         },
@@ -840,9 +844,20 @@ class _PresenterScreenState extends State<PresenterScreen> {
   }
 
   void _triggerAction(
-      String action, String title, String subtitle, Color color, String icon) {
+      String action, String title, String subtitle, Color color, String icon,
+      {bool sendWs = true}) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastActionTimestamp < 120) return;
+    _lastActionTimestamp = now;
+
     _triggerHaptic(action);
-    _sendWs(action);
+    if (sendWs) {
+      _sendWs(action);
+      _log("Enviado -> $title");
+    } else {
+      _log("Recibido <- $title");
+    }
+
     setState(() {
       _lastActionIcon = icon;
       _lastActionColor = color;
@@ -853,6 +868,136 @@ class _PresenterScreenState extends State<PresenterScreen> {
     Future.delayed(const Duration(milliseconds: 500), () {
       if (mounted) setState(() => _flashColor = Colors.transparent);
     });
+  }
+
+  void _openConsoleSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setConsoleState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Iconify(Ri.terminal_box_line,
+                          color: Color(0xFF38BDF8), size: 22),
+                      const SizedBox(width: 10),
+                      const Text(
+                        "Consola de Actividad",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Iconify(Ri.delete_bin_line,
+                            color: Colors.white60, size: 20),
+                        tooltip: "Limpiar consola",
+                        onPressed: () {
+                          setState(() => _logs.clear());
+                          setConsoleState(() {});
+                        },
+                      ),
+                      IconButton(
+                        icon: const Iconify(Ri.file_copy_line,
+                            color: Colors.white60, size: 20),
+                        tooltip: "Copiar logs",
+                        onPressed: () {
+                          if (_logs.isEmpty) return;
+                          Clipboard.setData(
+                              ClipboardData(text: _logs.reversed.join('\n')));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Logs copiados al portapapeles"),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "${_logs.length} eventos registrados (tiempo real)",
+                    style: const TextStyle(fontSize: 12, color: Colors.white54),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF020617),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF1E293B)),
+                      ),
+                      child: _logs.isEmpty
+                          ? const Center(
+                              child: Text(
+                                "No hay eventos registrados aún.\nLas pulsaciones y conexiones aparecerán aquí.",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    color: Colors.white38, fontSize: 13),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _logs.length,
+                              itemBuilder: (context, index) {
+                                final log = _logs[index];
+                                Color textColor = const Color(0xFFCBD5E1);
+                                if (log.contains("Enviado")) {
+                                  textColor = const Color(0xFF38BDF8);
+                                } else if (log.contains("Recibido") ||
+                                    log.contains("✓")) {
+                                  textColor = const Color(0xFF10B981);
+                                } else if (log.contains("[-]")) {
+                                  textColor = const Color(0xFFF59E0B);
+                                }
+                                return Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 3),
+                                  child: Text(
+                                    log,
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 12,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _openSettingsSheet() {
@@ -1063,6 +1208,29 @@ class _PresenterScreenState extends State<PresenterScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF334155)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Iconify(Ri.terminal_box_line,
+                          size: 18, color: Color(0xFF38BDF8)),
+                      label: const Text("Consola de Actividad",
+                          style: TextStyle(
+                              color: Colors.white, fontSize: 13)),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        Future.delayed(const Duration(milliseconds: 250), () {
+                          if (mounted) _openConsoleSheet();
+                        });
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -1319,6 +1487,11 @@ class _PresenterScreenState extends State<PresenterScreen> {
                 ],
               ),
             ),
+          ),
+          IconButton(
+            icon: const Iconify(Ri.terminal_box_line, color: Colors.white70, size: 20),
+            tooltip: 'Consola de Actividad',
+            onPressed: _openConsoleSheet,
           ),
           IconButton(
             icon: const Iconify(Ri.settings_3_line, color: Colors.white70, size: 20),

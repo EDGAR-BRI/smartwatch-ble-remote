@@ -83,9 +83,9 @@ def get_app_version_info():
         base_dir, "mobile_app", "build", "app", "outputs", "flutter-apk", "app-release.apk"
     )
 
-    version = "1.1.1+15"
-    version_name = "1.1.1"
-    build_number = "15"
+    version = "1.1.2+16"
+    version_name = "1.1.2"
+    build_number = "16"
     if os.path.exists(pubspec_path):
         try:
             with open(pubspec_path, "r", encoding="utf-8") as f:
@@ -143,8 +143,10 @@ class BridgeServer:
         self.pending_forward_task = None
         self.connected_sockets = set()
 
-    async def _broadcast(self, data):
+    async def _broadcast(self, data, exclude_ws=None):
         for s in list(self.connected_sockets):
+            if s is exclude_ws:
+                continue
             try:
                 await s.send_json(data)
             except Exception:
@@ -176,17 +178,17 @@ class BridgeServer:
                         self.clicker.forward()
                         now_str = datetime.datetime.now().strftime("%H:%M:%S")
                         print(f"[{now_str}] ⏩ Click manual: Avanzar")
-                        await self._broadcast({"action": "forward"})
+                        await self._broadcast({"action": "forward"}, exclude_ws=ws)
                     elif event_type == "back":
                         self.clicker.back()
                         now_str = datetime.datetime.now().strftime("%H:%M:%S")
                         print(f"[{now_str}] ⏪ Click manual: Retroceder")
-                        await self._broadcast({"action": "back"})
+                        await self._broadcast({"action": "back"}, exclude_ws=ws)
                     elif event_type in ("play_pause", "pause"):
                         self.clicker.pause()
                         now_str = datetime.datetime.now().strftime("%H:%M:%S")
                         print(f"[{now_str}] ⏯️ Pausa / Tecla U pulsada (Canva Telón)")
-                        await self._broadcast({"action": "play_pause"})
+                        await self._broadcast({"action": "play_pause"}, exclude_ws=ws)
 
         finally:
             self.connected_sockets.discard(ws)

@@ -1,6 +1,6 @@
 {
   "name": "bt-presenter",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Control de presentaciones en Linux con BT Presenter (Smartwatches, Auriculares Bluetooth y BLE)",
   "main": "web_bridge.py",
   "scripts": {

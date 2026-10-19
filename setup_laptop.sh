@@ -21,8 +21,30 @@ echo "╚═══════════════════════�
 echo -e "${NC}"
 echo -e "${BLUE}Configurando entorno para Linux (Wayland / X11)...${NC}\n"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "$PWD")"
+if [ -d "$SCRIPT_DIR" ]; then
+    cd "$SCRIPT_DIR"
+fi
+
+# Si se ejecuta fuera de la carpeta del proyecto (ej: curl | bash o desde Descargas)
+if [ ! -f "requirements.txt" ] || [ ! -f "web_bridge.py" ]; then
+    INSTALL_DIR="$HOME/smartwatch-remote"
+    echo -e "${YELLOW}Archivos del proyecto no encontrados en el directorio actual.${NC}"
+    echo -e "${BLUE}Instalando repositorio en: ${BOLD}$INSTALL_DIR${NC}..."
+    if ! command -v git &>/dev/null; then
+        echo "Instalando git..."
+        if command -v apt-get &>/dev/null; then
+            sudo apt-get update && sudo apt-get install -y git
+        fi
+    fi
+    if [ ! -d "$INSTALL_DIR" ]; then
+        git clone https://github.com/EDGAR-BRI/smartwatch-ble-remote.git "$INSTALL_DIR"
+    else
+        echo "Actualizando repositorio en $INSTALL_DIR..."
+        (cd "$INSTALL_DIR" && git pull --rebase 2>/dev/null || true)
+    fi
+    cd "$INSTALL_DIR"
+fi
 
 # 1. Comprobación de herramientas base del sistema
 echo -e "${BOLD}[1/6] Verificando dependencias base (Python 3 y OpenSSL)...${NC}"
@@ -146,7 +168,7 @@ APK_TARGET_FILE="$APK_TARGET_DIR/app-release.apk"
 if [ ! -f "$APK_TARGET_FILE" ]; then
     echo -e "Descargando la última versión del APK desde GitHub Releases..."
     mkdir -p "$APK_TARGET_DIR"
-    if curl -L -s -f -o "$APK_TARGET_FILE" "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/SmartwatchPresenter.apk"; then
+    if curl -L -s -f -o "$APK_TARGET_FILE" "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/BTPresenter.apk"; then
         echo -e "${GREEN}✓ APK descargado exitosamente para que tu laptop lo sirva a tu teléfono.${NC}"
     else
         echo -e "${YELLOW}Aviso: No se pudo descargar el APK en este momento. La laptop redirigirá al enlace de GitHub si el teléfono lo solicita.${NC}"
@@ -154,6 +176,14 @@ if [ ! -f "$APK_TARGET_FILE" ]; then
 else
     echo -e "${GREEN}✓ APK disponible en la laptop.${NC}"
 fi
+
+# 8. Crear script de inicio rápido start_presenter.sh
+cat << 'EOF' > start_presenter.sh
+#!/usr/bin/env bash
+cd "$(dirname "$0")"
+./venv/bin/python web_bridge.py "$@"
+EOF
+chmod +x start_presenter.sh
 
 # Obtener IP local de la laptop
 LOCAL_IP=$(./venv/bin/python -c '
@@ -172,7 +202,7 @@ echo -e "\n${GREEN}${BOLD}══════════════════
 echo -e "${GREEN}${BOLD}             🎉 ¡INSTALACIÓN COMPLETADA EXITOSAMENTE!               ${NC}"
 echo -e "${GREEN}${BOLD}════════════════════════════════════════════════════════════════════${NC}"
 echo -e "\n${BOLD}Para iniciar el control de presentaciones en tu laptop:${NC}"
-echo -e "  ${CYAN}./venv/bin/python web_bridge.py${NC}\n"
-echo -e "${BOLD}IP de tu laptop detectada:${NC} ${YELLOW}${BOLD}${LOCAL_IP}${NC}"
-echo -e "• En tu teléfono, introduce: ${YELLOW}${BOLD}${LOCAL_IP}:8888${NC}"
-echo -e "• O descarga la app APK desde: ${CYAN}https://${LOCAL_IP}:8888${NC}\n"
+echo -e "  ${CYAN}./start_presenter.sh${NC}  (o ./venv/bin/python web_bridge.py)\n"
+echo -e "${BOLD}IP de tu laptop:${NC} ${YELLOW}${BOLD}${LOCAL_IP}${NC}"
+echo -e "• Abre la web desde tu teléfono o laptop: ${CYAN}https://${LOCAL_IP}:8888${NC}"
+echo -e "• O descarga la app Android directamente desde la web o GitHub.\n"

@@ -3,20 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BT Presenter • Control de Presentaciones Universal</title>
+    <title>BT Presenter • Centro de Instalación y Control</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="/static/qrcode.min.js"></script>
     <style>
         :root {
-            --bg: #0f172a;
-            --card: #1e293b;
-            --border: #334155;
+            --bg: #0b1120;
+            --card: #151f32;
+            --card-inner: #0f172a;
+            --border: #24324d;
             --primary: #38bdf8;
             --primary-hover: #0284c7;
+            --primary-rgb: 56, 189, 248;
             --success: #10b981;
             --warning: #f59e0b;
             --danger: #ef4444;
             --text: #f8fafc;
             --text-muted: #94a3b8;
+            --text-dim: #64748b;
         }
         * {
             box-sizing: border-box;
@@ -31,15 +35,16 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 32px 16px;
+            padding: 32px 16px 48px;
         }
         .container {
             width: 100%;
-            max-width: 480px;
+            max-width: 860px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 20px;
         }
+        /* Header */
         .header {
             text-align: center;
             margin-bottom: 8px;
@@ -47,32 +52,51 @@
         .logo-box {
             display: inline-block;
             margin-bottom: 12px;
+            position: relative;
         }
         .logo-img {
-            width: 80px;
-            height: 80px;
-            border-radius: 20px;
-            box-shadow: 0 8px 24px rgba(56, 189, 248, 0.25);
+            width: 84px;
+            height: 84px;
+            border-radius: 22px;
+            box-shadow: 0 10px 30px rgba(56, 189, 248, 0.28);
             object-fit: cover;
+            border: 2px solid rgba(56, 189, 248, 0.3);
         }
         .header h1 {
-            font-size: 1.6rem;
+            font-size: 1.85rem;
             color: var(--text);
             font-weight: 800;
             letter-spacing: -0.5px;
         }
         .header p {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             color: var(--text-muted);
-            margin-top: 6px;
-            line-height: 1.4;
+            margin-top: 8px;
+            line-height: 1.5;
+            max-width: 580px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        /* Grid de Instalación: 2 columnas en desktop / 1 en móvil */
+        .install-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        @media (min-width: 768px) {
+            .install-grid {
+                grid-template-columns: 1fr 1fr;
+            }
         }
         .card {
             background: var(--card);
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 18px;
+            padding: 22px;
             border: 1px solid var(--border);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         .card-header {
             display: flex;
@@ -83,15 +107,97 @@
             font-weight: 700;
             color: var(--text-muted);
         }
+        .card-title-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-title-icon {
+            font-size: 1.25rem;
+        }
+        .card-title-text {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text);
+        }
         .tag {
             color: var(--success);
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             background: rgba(16, 185, 129, 0.15);
-            padding: 4px 8px;
+            padding: 4px 10px;
             border-radius: 20px;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: 0.3px;
         }
-        .btn-download {
+        .tag-pc {
+            color: var(--primary);
+            background: rgba(56, 189, 248, 0.15);
+        }
+        .card-desc {
+            font-size: 0.86rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+            margin-bottom: 16px;
+        }
+        /* Bloque de Comando Terminal */
+        .cmd-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .cmd-box {
+            background: var(--card-inner);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 14px;
+            position: relative;
+        }
+        .cmd-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.82rem;
+            color: #38bdf8;
+            overflow-x: auto;
+            white-space: nowrap;
+            padding-right: 4px;
+            flex: 1;
+        }
+        .btn-copy {
+            background: rgba(56, 189, 248, 0.12);
+            color: var(--primary);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-copy:hover {
+            background: rgba(56, 189, 248, 0.25);
+            color: white;
+        }
+        .btn-copy.copied {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: var(--success);
+        }
+        /* Botones de Descarga */
+        .btn-download-primary {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -101,31 +207,32 @@
             border: 1px solid #38bdf8;
             color: white;
             text-decoration: none;
-            padding: 16px;
+            padding: 14px;
             border-radius: 12px;
             transition: all 0.2s ease;
             box-shadow: 0 4px 16px rgba(2, 132, 199, 0.35);
+            text-align: center;
         }
-        .btn-download:hover {
+        .btn-download-primary:hover {
             transform: translateY(-1px);
             box-shadow: 0 6px 20px rgba(2, 132, 199, 0.45);
         }
-        .btn-download:active {
+        .btn-download-primary:active {
             transform: scale(0.98);
         }
-        .btn-download .title {
-            font-size: 1.05rem;
+        .btn-download-primary .title {
+            font-size: 1rem;
             font-weight: 700;
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        .btn-download .subtitle {
-            font-size: 0.8rem;
+        .btn-download-primary .subtitle {
+            font-size: 0.76rem;
             color: #bae6fd;
-            margin-top: 4px;
+            margin-top: 3px;
         }
-        .btn-github {
+        .btn-subtle {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -141,22 +248,61 @@
             font-weight: 600;
             margin-top: 10px;
             transition: all 0.15s;
+            cursor: pointer;
         }
-        .btn-github:hover {
+        .btn-subtle:hover {
             background: rgba(255, 255, 255, 0.08);
             color: var(--text);
+        }
+        /* QR Code Box */
+        .qr-section {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            background: var(--card-inner);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+        .qr-wrapper {
+            background: white;
+            padding: 6px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            width: 92px;
+            height: 92px;
+        }
+        .qr-wrapper img, .qr-wrapper canvas {
+            display: block;
+            width: 80px !important;
+            height: 80px !important;
+        }
+        .qr-info {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .qr-info strong {
+            color: var(--text);
+            display: block;
+            margin-bottom: 3px;
+            font-size: 0.85rem;
         }
         /* Step by Step */
         .step-list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
         }
         .step-item {
             display: flex;
             align-items: flex-start;
-            gap: 14px;
-            background: rgba(15, 23, 42, 0.4);
+            gap: 12px;
+            background: var(--card-inner);
             padding: 12px 14px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.03);
@@ -165,13 +311,13 @@
             background: rgba(56, 189, 248, 0.15);
             color: var(--primary);
             font-weight: 800;
-            font-size: 0.85rem;
-            padding: 4px 10px;
+            font-size: 0.82rem;
+            padding: 4px 8px;
             border-radius: 8px;
             flex-shrink: 0;
         }
         .step-content {
-            font-size: 0.85rem;
+            font-size: 0.84rem;
             line-height: 1.45;
             color: #cbd5e1;
         }
@@ -179,17 +325,17 @@
             color: white;
             display: block;
             margin-bottom: 2px;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
         }
-        /* Remote Control Card */
+        /* Probador Remoto */
         .flash-card {
-            background: #0f172a;
+            background: var(--card-inner);
             border-radius: 12px;
             padding: 16px;
             text-align: center;
             border: 1.5px solid var(--border);
             transition: all 0.2s ease;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
         .flash-card.active-forward {
             background: rgba(56, 189, 248, 0.15);
@@ -223,7 +369,7 @@
         .btn-manual {
             flex: 1;
             padding: 12px 8px;
-            background: #0f172a;
+            background: var(--card-inner);
             border: 1px solid var(--border);
             color: var(--text);
             border-radius: 10px;
@@ -245,16 +391,17 @@
             font-weight: 700;
         }
         .log-box {
-            background: #0b0f19;
+            background: #060a12;
             border-radius: 10px;
             padding: 10px;
-            font-size: 0.75rem;
+            font-size: 0.74rem;
             color: var(--text-muted);
             height: 90px;
             overflow-y: auto;
             border: 1px solid var(--border);
             margin-top: 12px;
             display: none;
+            font-family: ui-monospace, monospace;
         }
         .toggle-logs {
             background: none;
@@ -269,87 +416,170 @@
         .toggle-logs:hover {
             color: var(--text);
         }
+        .footer {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 10px;
+        }
+        .footer a {
+            color: var(--text-muted);
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Encabezado Amigable con Mascota -->
+        <!-- Encabezado Principal -->
         <div class="header">
             <div class="logo-box">
                 <img src="/static/img/logo.png" alt="BT Presenter" class="logo-img">
             </div>
             <h1>BT Presenter</h1>
-            <p>Control de presentaciones universal para tus auriculares Bluetooth, Smartwatch y teléfono móvil.</p>
+            <p>Control remoto universal para presentaciones en Canva, PowerPoint y Google Slides usando tu Smartwatch o Auriculares Bluetooth.</p>
         </div>
 
-        <!-- Tarjeta Principal: Descarga del APK -->
-        <div class="card">
-            <div class="card-header">
-                <span>APLICACIÓN OFICIAL ANDROID</span>
-                <span id="apkVersionPill" class="tag">DISPONIBLE</span>
-            </div>
-            <a id="btnDownloadApk" href="/BTPresenter.apk" download class="btn-download">
-                <span class="title">📥 Descargar para Android (APK)</span>
-                <span id="apkDetails" class="subtitle">BTPresenter.apk • Seguro y directo</span>
-            </a>
-            <a id="btnGithubRelease" href="https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest" target="_blank" class="btn-github">
-                <span>Ver en GitHub Releases & Código Fuente</span>
-            </a>
-        </div>
+        <!-- Grid de Instaladores (PC y Móvil) -->
+        <div class="install-grid">
+            <!-- TARJETA 1: Para Laptop / PC (Linux) -->
+            <div class="card">
+                <div>
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <span class="card-title-icon">💻</span>
+                            <span class="card-title-text">En tu Laptop (Linux)</span>
+                        </div>
+                        <span class="tag tag-pc">RECEPTOR</span>
+                    </div>
+                    <p class="card-desc">
+                        Configura el teclado virtual <code>/dev/uinput</code>, entorno Python y firewall para recibir los toques de tus auriculares o reloj inteligente.
+                    </p>
 
-        <!-- Tarjeta Guía Rápida: 3 Pasos Simples -->
-        <div class="card">
-            <div class="card-header">
-                <span>¿CÓMO FUNCIONA?</span>
-                <span class="tag" style="color: var(--primary); background: rgba(56, 189, 248, 0.15);">3 PASOS</span>
-            </div>
-            <div class="step-list">
-                <div class="step-item">
-                    <span class="step-num">01</span>
-                    <div class="step-content">
-                        <strong>Descarga e instala la app en tu teléfono</strong>
-                        Pulsa el botón de descarga superior e instala el archivo en tu teléfono Android.
+                    <!-- Comando de Terminal de 1 Línea -->
+                    <div class="cmd-label">⚡ Instalación en 1 comando (Terminal)</div>
+                    <div class="cmd-box">
+                        <code id="cmdTerminal" class="cmd-code">curl -k -sSL https://.../setup | bash</code>
+                        <button id="btnCopyCmd" class="btn-copy" onclick="copySetupCommand()">
+                            <span id="copyIcon">📋</span> <span id="copyText">Copiar</span>
+                        </button>
                     </div>
+
+                    <!-- Botón de Descarga del Script -->
+                    <a id="btnDownloadSetup" href="/setup?download=1" download="setup_laptop.sh" class="btn-download-primary" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-color: var(--border);">
+                        <span class="title">📥 Descargar setup_laptop.sh</span>
+                        <span class="subtitle">Ejecutable bash para Linux (Wayland / X11)</span>
+                    </a>
                 </div>
-                <div class="step-item">
-                    <span class="step-num">02</span>
-                    <div class="step-content">
-                        <strong>Abre la app en el mismo Wi-Fi</strong>
-                        Al estar en la misma red Wi-Fi que tu laptop, la app la detectará automáticamente.
-                    </div>
-                </div>
-                <div class="step-item">
-                    <span class="step-num">03</span>
-                    <div class="step-content">
-                        <strong>Presenta sin tocar la laptop</strong>
-                        Abre Canva, PowerPoint o PDF. Pasa tus diapositivas tocando tus auriculares, girando tu reloj o con los botones en pantalla.
+
+                <div style="margin-top: 14px;">
+                    <div class="cmd-label">▶ Para iniciar el servidor:</div>
+                    <div class="cmd-box" style="margin-bottom: 0;">
+                        <code class="cmd-code" style="color: #10b981;">./start_presenter.sh</code>
                     </div>
                 </div>
             </div>
+
+            <!-- TARJETA 2: Para Teléfono Android -->
+            <div class="card">
+                <div>
+                    <div class="card-header">
+                        <div class="card-title-group">
+                            <span class="card-title-icon">📱</span>
+                            <span class="card-title-text">En tu Teléfono (Android)</span>
+                        </div>
+                        <span id="apkVersionPill" class="tag">v1.1.3 DISPONIBLE</span>
+                    </div>
+                    <p class="card-desc">
+                        Detecta giros de corona de tu Smartwatch o botones multimedia de tus auriculares Bluetooth y los transmite a la laptop por Wi-Fi.
+                    </p>
+
+                    <!-- Botón de Descarga APK -->
+                    <a id="btnDownloadApk" href="/BTPresenter.apk" download class="btn-download-primary">
+                        <span class="title">📥 Descargar BTPresenter.apk</span>
+                        <span id="apkDetails" class="subtitle">BTPresenter.apk • Directo y seguro</span>
+                    </a>
+
+                    <!-- Código QR para Descargar desde el Móvil -->
+                    <div class="qr-section">
+                        <div class="qr-wrapper" id="qrcodeWrapper" title="Escanea con tu cámara móvil para descargar el APK">
+                            <div id="qrcode"></div>
+                        </div>
+                        <div class="qr-info">
+                            <strong>Escanear desde tu Móvil</strong>
+                            Apunta con la cámara de tu teléfono para descargar el archivo APK directamente sin cables.
+                        </div>
+                    </div>
+                </div>
+
+                <a id="btnGithubRelease" href="https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest" target="_blank" class="btn-subtle" style="margin-top: 14px;">
+                    <span>Ver en GitHub Releases & Código Fuente ↗</span>
+                </a>
+            </div>
         </div>
 
-        <!-- Tarjeta de Control Remoto & Prueba -->
+        <!-- Tarjeta de Control Remoto & Probador en Vivo -->
         <div class="card">
             <div class="card-header">
-                <span>PROBADOR DE CONTROL REMOTO</span>
+                <div class="card-title-group">
+                    <span class="card-title-icon">🎮</span>
+                    <span class="card-title-text">Probador de Control Remoto en Vivo</span>
+                </div>
                 <span id="wsStatusBadge" class="tag">LISTO</span>
             </div>
 
             <!-- Visualizador de Acción -->
             <div id="flashCard" class="flash-card">
                 <div id="flashText" class="flash-text">Listo para tu presentación</div>
-                <div id="flashSub" class="flash-sub">Esperando toques desde auriculares, reloj o botones...</div>
+                <div id="flashSub" class="flash-sub">Esperando toques desde auriculares, reloj inteligente o botones de prueba...</div>
             </div>
 
-            <!-- Botones de Control Remoto -->
+            <!-- Botones Manuales de Prueba -->
             <div class="manual-controls">
                 <button id="btnManualBack" class="btn-manual">◀ Anterior</button>
-                <button id="btnManualPause" class="btn-manual" style="border-color: #a855f7; color: #d8b4fe;">⏸️ Telón</button>
+                <button id="btnManualPause" class="btn-manual" style="border-color: #a855f7; color: #d8b4fe;">⏸️ Telón Negro</button>
                 <button id="btnManualNext" class="btn-manual primary">Siguiente ▶</button>
             </div>
 
-            <button id="btnToggleLogs" class="toggle-logs" onclick="toggleLogs()">Ver detalles de conexión</button>
+            <button id="btnToggleLogs" class="toggle-logs" onclick="toggleLogs()">Ver registro de eventos en tiempo real</button>
             <div id="logBox" class="log-box"></div>
+        </div>
+
+        <!-- Tarjeta Guía Rápida: 3 Pasos Simples -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title-group">
+                    <span class="card-title-icon">🚀</span>
+                    <span class="card-title-text">¿Cómo usarlo en tu presentación?</span>
+                </div>
+                <span class="tag tag-pc">3 PASOS</span>
+            </div>
+            <div class="step-list">
+                <div class="step-item">
+                    <span class="step-num">01</span>
+                    <div class="step-content">
+                        <strong>Instala en tu laptop y teléfono</strong>
+                        Ejecuta el comando en tu laptop Linux e instala el APK en tu dispositivo Android.
+                    </div>
+                </div>
+                <div class="step-item">
+                    <span class="step-num">02</span>
+                    <div class="step-content">
+                        <strong>Conéctate al mismo Wi-Fi</strong>
+                        Inicia el servidor en tu laptop con <code>./start_presenter.sh</code> y abre la app en el teléfono. Se detectarán automáticamente.
+                    </div>
+                </div>
+                <div class="step-item">
+                    <span class="step-num">03</span>
+                    <div class="step-content">
+                        <strong>Controla tus diapositivas en Canva o PowerPoint</strong>
+                        Gira la corona de tu smartwatch o toca tus auriculares para avanzar o retroceder diapositivas con libertad en el escenario.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            BT Presenter • Código Abierto bajo Licencia MIT • <a href="https://github.com/EDGAR-BRI/smartwatch-ble-remote" target="_blank">Repositorio en GitHub</a>
         </div>
     </div>
 
@@ -362,16 +592,72 @@
         const apkVersionPill = document.getElementById('apkVersionPill');
         const apkDetails = document.getElementById('apkDetails');
         const btnToggleLogs = document.getElementById('btnToggleLogs');
+        const cmdTerminal = document.getElementById('cmdTerminal');
+        const btnCopyCmd = document.getElementById('btnCopyCmd');
+        const copyIcon = document.getElementById('copyIcon');
+        const copyText = document.getElementById('copyText');
 
         let ws = null;
+
+        // Construir el comando dinámico de instalación para la terminal
+        function updateTerminalCommand() {
+            const host = window.location.host;
+            const isHttps = window.location.protocol === 'https:';
+            // Si es https, añadimos -k para permitir certificados autofirmados locales
+            const curlFlag = isHttps ? '-k -sSL' : '-sSL';
+            const setupUrl = `${window.location.protocol}//${host}/setup`;
+            const command = `curl ${curlFlag} ${setupUrl} | bash`;
+            cmdTerminal.innerText = command;
+            cmdTerminal.setAttribute('data-cmd', command);
+        }
+        updateTerminalCommand();
+
+        // Función para copiar comando al portapapeles
+        function copySetupCommand() {
+            const cmd = cmdTerminal.getAttribute('data-cmd') || cmdTerminal.innerText;
+            navigator.clipboard.writeText(cmd).then(() => {
+                btnCopyCmd.classList.add('copied');
+                copyIcon.innerText = '✓';
+                copyText.innerText = '¡Copiado!';
+                setTimeout(() => {
+                    btnCopyCmd.classList.remove('copied');
+                    copyIcon.innerText = '📋';
+                    copyText.innerText = 'Copiar';
+                }, 2000);
+            }).catch(() => {
+                prompt("Copia este comando:", cmd);
+            });
+        }
+
+        // Generar código QR para descargar el APK desde el teléfono
+        function generateApkQr() {
+            const apkUrl = `${window.location.origin}/BTPresenter.apk`;
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+            try {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(qrContainer, {
+                        text: apkUrl,
+                        width: 80,
+                        height: 80,
+                        colorDark: "#0f172a",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                }
+            } catch (e) {
+                console.error("Error generando código QR:", e);
+            }
+        }
+        generateApkQr();
 
         function toggleLogs() {
             if (logBox.style.display === "block") {
                 logBox.style.display = "none";
-                btnToggleLogs.innerText = "Ver detalles de conexión";
+                btnToggleLogs.innerText = "Ver registro de eventos en tiempo real";
             } else {
                 logBox.style.display = "block";
-                btnToggleLogs.innerText = "Ocultar detalles de conexión";
+                btnToggleLogs.innerText = "Ocultar registro de eventos";
             }
         }
 
@@ -394,8 +680,9 @@
             .then(res => res.json())
             .then(data => {
                 if (data.version) {
-                    apkVersionPill.innerText = `v${data.version}`;
-                    apkDetails.innerText = `Versión v${data.version} • ${data.size_mb} • Android 8.0+`;
+                    apkVersionPill.innerText = `v${data.version_name || data.version} DISPONIBLE`;
+                    const size = data.size_mb !== '--' ? data.size_mb : '66 MB';
+                    apkDetails.innerText = `Versión v${data.version_name || data.version} • ${size} • Android 8.0+`;
                 }
             })
             .catch(() => {});
@@ -436,6 +723,9 @@
                     } else if (data.action === "play_pause") {
                         triggerFlash("pause", "⏸️ Telón Negro (Pausa)", "Pantalla pausada");
                         log("Telón / Pausa activada");
+                    } else if (data.action === "key") {
+                        triggerFlash("forward", `⌨️ Tecla simulada: ${data.key}`, `Evento: ${data.event || 'key'}`);
+                        log(`Tecla simulada: ${data.key}`);
                     }
                 } catch (e) {}
             };

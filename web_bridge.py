@@ -272,6 +272,30 @@ class BridgeServer:
         # Si la laptop no tiene el APK compilado localmente, redirige automáticamente a GitHub Releases
         raise web.HTTPFound(GITHUB_LATEST_RELEASE_APK_URL)
 
+    async def handle_setup(self, request):
+        setup_path = os.path.join(os.path.dirname(__file__), "setup_laptop.sh")
+        if os.path.exists(setup_path):
+            user_agent = request.headers.get("User-Agent", "").lower()
+            is_cli = "curl" in user_agent or "wget" in user_agent
+            want_download = request.query.get("download") == "1"
+
+            headers = {
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            }
+            if want_download and not is_cli:
+                headers["Content-Disposition"] = 'attachment; filename="setup_laptop.sh"'
+            else:
+                headers["Content-Type"] = "text/x-shellscript; charset=utf-8"
+
+            return web.FileResponse(setup_path, headers=headers)
+        return web.Response(
+            text="#!/usr/bin/env bash\necho 'Error: setup_laptop.sh no encontrado en el servidor'\nexit 1\n",
+            status=404,
+            content_type="text/plain",
+        )
+
 
 class DiscoveryProtocol(asyncio.DatagramProtocol):
     def __init__(self, local_ip, port=8888, http_port=8080):
@@ -336,6 +360,10 @@ async def main():
     app.router.add_get("/download", bridge.handle_download)
     app.router.add_get("/api/app-info", bridge.handle_app_info)
     app.router.add_get("/version", bridge.handle_app_info)
+    app.router.add_get("/setup", bridge.handle_setup)
+    app.router.add_get("/setup_laptop.sh", bridge.handle_setup)
+    app.router.add_get("/setup.sh", bridge.handle_setup)
+    app.router.add_get("/install", bridge.handle_setup)
 
     runner = web.AppRunner(app)
     await runner.setup()

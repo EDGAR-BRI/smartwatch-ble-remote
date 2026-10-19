@@ -21,13 +21,32 @@ class DevHttpOverrides extends HttpOverrides {
 }
 
 const String defaultPcUrl = "10.0.0.3:8888";
-const String appVersion = "1.1.2+16";
+const String appVersion = "1.1.3+17";
 const String githubLatestApkUrl =
     "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest/download/BTPresenter.apk";
 const String githubLatestReleaseUrl =
     "https://github.com/EDGAR-BRI/smartwatch-ble-remote/releases/latest";
 const MethodChannel _mediaChannel =
     MethodChannel('com.edgardev.mobile_app/media_session');
+
+const Map<String, String> kAvailableKeys = {
+  "RIGHT": "Flecha Derecha (Avanzar) ➡️",
+  "LEFT": "Flecha Izquierda (Retroceder) ⬅️",
+  "UP": "Flecha Arriba ⬆️",
+  "DOWN": "Flecha Abajo ⬇️",
+  "SPACE": "Espacio (Avanzar / Pausa) ␣",
+  "PAGEDOWN": "AvPág (Pág Siguiente) ⬇️",
+  "PAGEUP": "RePág (Pág Anterior) ⬆️",
+  "ENTER": "Enter ↵",
+  "ESC": "Escape ⎋",
+  "F5": "F5 (Iniciar presentación) 🖥️",
+  "U": "U (Telón Canva) 🎭",
+  "B": "B (Pantalla Negra PPT) ⬛",
+  "W": "W (Pantalla Blanca PPT) ⬜",
+  "VOLUMEUP": "Volumen + PC 🔊",
+  "VOLUMEDOWN": "Volumen - PC 🔉",
+  "MUTE": "Silenciar PC 🔇",
+};
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +88,14 @@ class _PresenterScreenState extends State<PresenterScreen> {
   WebSocketChannel? _channel;
   Timer? _wsReconnectTimer;
 
+  // Teclas simuladas configurables (separadas para Volumen y Música)
+  String _keyVolUp = "RIGHT";
+  String _keyVolDown = "LEFT";
+  String _keyMusicNext = "RIGHT";
+  String _keyMusicPrev = "LEFT";
+  String _keyPlayPause = "U";
+  String? _configFilePath;
+
   bool _isBtConnected = false;
   String _btDeviceName = "Sin dispositivo";
   bool _isWsConnected = false;
@@ -104,6 +131,8 @@ class _PresenterScreenState extends State<PresenterScreen> {
       await WakelockPlus.enable();
     } catch (_) {}
 
+    await _initConfigPath();
+
     try {
       final cacheDir = await _mediaChannel.invokeMethod<String>('getCacheDir');
       if (cacheDir != null) {
@@ -120,6 +149,101 @@ class _PresenterScreenState extends State<PresenterScreen> {
     _connectWebSocket();
   }
 
+  String _formatKey(String key) {
+    return kAvailableKeys[key.toUpperCase()] ?? key;
+  }
+
+  String _formatKeyShort(String key) {
+    switch (key.toUpperCase()) {
+      case "RIGHT":
+        return "➡️";
+      case "LEFT":
+        return "⬅️";
+      case "UP":
+        return "⬆️";
+      case "DOWN":
+        return "⬇️";
+      case "SPACE":
+        return "Espacio";
+      case "PAGEDOWN":
+        return "AvPág";
+      case "PAGEUP":
+        return "RePág";
+      case "ENTER":
+        return "↵";
+      case "ESC":
+        return "ESC";
+      case "F5":
+        return "F5";
+      case "U":
+        return "U";
+      case "B":
+        return "B";
+      case "W":
+        return "W";
+      case "VOLUMEUP":
+        return "Vol+";
+      case "VOLUMEDOWN":
+        return "Vol-";
+      case "MUTE":
+        return "Mute";
+      default:
+        return key;
+    }
+  }
+
+  Future<void> _initConfigPath() async {
+    try {
+      String? dir = await _mediaChannel.invokeMethod<String>('getFilesDir');
+      dir ??= await _mediaChannel.invokeMethod<String>('getCacheDir');
+      if (dir != null) {
+        _configFilePath = '$dir/presenter_config.json';
+        await _loadConfig();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadConfig() async {
+    if (_configFilePath == null) return;
+    try {
+      final file = File(_configFilePath!);
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final map = jsonDecode(content) as Map<String, dynamic>;
+        setState(() {
+          if (map['keyVolUp'] != null) _keyVolUp = map['keyVolUp'];
+          if (map['keyVolDown'] != null) _keyVolDown = map['keyVolDown'];
+          if (map['keyMusicNext'] != null) _keyMusicNext = map['keyMusicNext'];
+          if (map['keyMusicPrev'] != null) _keyMusicPrev = map['keyMusicPrev'];
+          if (map['keyPlayPause'] != null) _keyPlayPause = map['keyPlayPause'];
+          if (map['hapticEnabled'] != null) {
+            _hapticEnabled = map['hapticEnabled'] == true;
+          }
+          if (map['pcUrl'] != null && (map['pcUrl'] as String).isNotEmpty) {
+            _pcController.text = map['pcUrl'];
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveConfig() async {
+    if (_configFilePath == null) return;
+    try {
+      final file = File(_configFilePath!);
+      final data = {
+        'keyVolUp': _keyVolUp,
+        'keyVolDown': _keyVolDown,
+        'keyMusicNext': _keyMusicNext,
+        'keyMusicPrev': _keyMusicPrev,
+        'keyPlayPause': _keyPlayPause,
+        'hapticEnabled': _hapticEnabled,
+        'pcUrl': _pcController.text.trim(),
+      };
+      await file.writeAsString(jsonEncode(data));
+    } catch (_) {}
+  }
+
   Future<void> _setupMediaSession() async {
     _mediaChannel.setMethodCallHandler((call) async {
       if (call.method == "onMediaAction") {
@@ -132,29 +256,50 @@ class _PresenterScreenState extends State<PresenterScreen> {
             }
           });
         }
-        if (action == "forward") {
+        if (action == "volume_up") {
           _triggerAction(
-            "forward",
-            "Siguiente Diapositiva",
-            "Disparo desde auriculares / reloj",
+            "volume_up",
+            "Subir Volumen (Corona)",
+            "Simula: [${_formatKeyShort(_keyVolUp)}]",
             const Color(0xFF38BDF8),
-            Ri.skip_forward_fill,
+            Ri.volume_up_fill,
+            simulatedKey: _keyVolUp,
           );
-        } else if (action == "back") {
+        } else if (action == "volume_down") {
           _triggerAction(
-            "back",
-            "Diapositiva Anterior",
-            "Disparo desde auriculares / reloj",
+            "volume_down",
+            "Bajar Volumen (Corona)",
+            "Simula: [${_formatKeyShort(_keyVolDown)}]",
             const Color(0xFFF43F5E),
+            Ri.volume_down_fill,
+            simulatedKey: _keyVolDown,
+          );
+        } else if (action == "music_next" || action == "forward") {
+          _triggerAction(
+            "music_next",
+            "Música Siguiente (⏭️)",
+            "Simula: [${_formatKeyShort(_keyMusicNext)}]",
+            const Color(0xFF0284C7),
+            Ri.skip_forward_fill,
+            simulatedKey: _keyMusicNext,
+          );
+        } else if (action == "music_prev" || action == "back") {
+          _triggerAction(
+            "music_prev",
+            "Música Anterior (⏮️)",
+            "Simula: [${_formatKeyShort(_keyMusicPrev)}]",
+            const Color(0xFFE11D48),
             Ri.skip_back_fill,
+            simulatedKey: _keyMusicPrev,
           );
         } else if (action == "play_pause") {
           _triggerAction(
             "play_pause",
-            "Telón Negro (Pausa)",
-            "Disparo desde auriculares / reloj",
+            "Telón / Pausa (⏯️)",
+            "Simula: [${_formatKeyShort(_keyPlayPause)}]",
             const Color(0xFFA855F7),
             Ri.pause_circle_fill,
+            simulatedKey: _keyPlayPause,
           );
         }
       } else if (call.method == "onBluetoothDeviceState") {
@@ -681,10 +826,18 @@ class _PresenterScreenState extends State<PresenterScreen> {
   void _triggerHaptic(String action) {
     if (!_hapticEnabled) return;
     try {
-      _mediaChannel.invokeMethod('vibrate', {'pattern': action});
-      if (action == "forward") {
+      String pattern = "forward";
+      if (action == "volume_down" ||
+          action == "music_prev" ||
+          action == "back") {
+        pattern = "back";
+      } else if (action == "play_pause" || action == "pause") {
+        pattern = "play_pause";
+      }
+      _mediaChannel.invokeMethod('vibrate', {'pattern': pattern});
+      if (pattern == "forward") {
         HapticFeedback.mediumImpact();
-      } else if (action == "back") {
+      } else if (pattern == "back") {
         HapticFeedback.lightImpact();
         Future.delayed(const Duration(milliseconds: 90), () {
           HapticFeedback.lightImpact();
@@ -832,28 +985,32 @@ class _PresenterScreenState extends State<PresenterScreen> {
     }
   }
 
-  void _sendWs(String event) {
+  void _sendWs(String event, {String? key}) {
     if (_channel != null) {
       try {
-        _channel!.sink.add(jsonEncode({
+        final Map<String, dynamic> payload = {
           "event": event,
           "timestamp": DateTime.now().millisecondsSinceEpoch,
-        }));
+        };
+        if (key != null && key.isNotEmpty) {
+          payload["key"] = key;
+        }
+        _channel!.sink.add(jsonEncode(payload));
       } catch (_) {}
     }
   }
 
   void _triggerAction(
       String action, String title, String subtitle, Color color, String icon,
-      {bool sendWs = true}) {
+      {String? simulatedKey, bool sendWs = true}) {
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastActionTimestamp < 120) return;
     _lastActionTimestamp = now;
 
     _triggerHaptic(action);
     if (sendWs) {
-      _sendWs(action);
-      _log("Enviado -> $title");
+      _sendWs(action, key: simulatedKey);
+      _log("Enviado -> $title ${simulatedKey != null ? '[$simulatedKey]' : ''}");
     } else {
       _log("Recibido <- $title");
     }
@@ -1000,6 +1157,324 @@ class _PresenterScreenState extends State<PresenterScreen> {
     );
   }
 
+  Widget _buildKeyGroupHeader({
+    required String icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Iconify(icon, color: iconColor, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildKeyDropdown({
+    required String label,
+    required String value,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(height: 2),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: kAvailableKeys.containsKey(value) ? value : "RIGHT",
+              dropdownColor: const Color(0xFF1E293B),
+              icon: const Iconify(Ri.arrow_down_s_line,
+                  color: Colors.white70, size: 20),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              items: kAvailableKeys.entries.map((entry) {
+                return DropdownMenuItem<String>(
+                  value: entry.key,
+                  child: Text(
+                    entry.value,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openKeyMappingSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E293B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.85,
+              ),
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Iconify(Ri.keyboard_box_line,
+                              color: Color(0xFF38BDF8), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Configurar Teclas Simuladas",
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                "Define qué tecla presiona cada control",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Iconify(Ri.close_line,
+                              color: Colors.white70, size: 22),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // SECCIÓN 1: CONTROLES DE VOLUMEN
+                    _buildKeyGroupHeader(
+                      icon: Ri.volume_up_fill,
+                      iconColor: const Color(0xFF38BDF8),
+                      title: "Controles de Volumen",
+                      subtitle: "Rueda / corona digital del reloj y botones físicos de volumen",
+                    ),
+                    const SizedBox(height: 10),
+                    _buildKeyDropdown(
+                      label: "Subir Volumen (➕ / Corona Horaria)",
+                      value: _keyVolUp,
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _keyVolUp = val);
+                          setSheetState(() {});
+                          _saveConfig();
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _buildKeyDropdown(
+                      label: "Bajar Volumen (➖ / Corona Antihoraria)",
+                      value: _keyVolDown,
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _keyVolDown = val);
+                          setSheetState(() {});
+                          _saveConfig();
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 18),
+                    const Divider(color: Color(0xFF334155), height: 1),
+                    const SizedBox(height: 16),
+
+                    // SECCIÓN 2: CONTROLES DE MÚSICA
+                    _buildKeyGroupHeader(
+                      icon: Ri.music_fill,
+                      iconColor: const Color(0xFF10B981),
+                      title: "Controles de Música",
+                      subtitle: "Botones Siguiente y Anterior en audífonos y pantalla del reloj",
+                    ),
+                    const SizedBox(height: 10),
+                    _buildKeyDropdown(
+                      label: "Siguiente Pista (⏭️ / Doble pulsación)",
+                      value: _keyMusicNext,
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _keyMusicNext = val);
+                          setSheetState(() {});
+                          _saveConfig();
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _buildKeyDropdown(
+                      label: "Anterior Pista (⏮️ / Triple pulsación)",
+                      value: _keyMusicPrev,
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _keyMusicPrev = val);
+                          setSheetState(() {});
+                          _saveConfig();
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 18),
+                    const Divider(color: Color(0xFF334155), height: 1),
+                    const SizedBox(height: 16),
+
+                    // SECCIÓN 3: CONTROL DE PAUSA / TELÓN
+                    _buildKeyGroupHeader(
+                      icon: Ri.pause_circle_fill,
+                      iconColor: const Color(0xFFA855F7),
+                      title: "Control de Pausa / Telón",
+                      subtitle: "Botón Play/Pausa en audífonos o botón en pantalla",
+                    ),
+                    const SizedBox(height: 10),
+                    _buildKeyDropdown(
+                      label: "Play / Pausa (⏯️ / Canva Telón)",
+                      value: _keyPlayPause,
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() => _keyPlayPause = val);
+                          setSheetState(() {});
+                          _saveConfig();
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Botón Restablecer
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFCBD5E1),
+                          side: const BorderSide(color: Color(0xFF334155)),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Iconify(Ri.refresh_line,
+                            size: 16, color: Colors.white70),
+                        label: const Text(
+                          "Restablecer Valores por Defecto",
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _keyVolUp = "RIGHT";
+                            _keyVolDown = "LEFT";
+                            _keyMusicNext = "RIGHT";
+                            _keyMusicPrev = "LEFT";
+                            _keyPlayPause = "U";
+                          });
+                          setSheetState(() {});
+                          _saveConfig();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _openSettingsSheet() {
     showModalBottomSheet(
       context: context,
@@ -1110,6 +1585,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                         TextButton(
                           onPressed: () {
                             _connectWebSocket();
+                            _saveConfig();
                             Navigator.pop(ctx);
                           },
                           child: const Text("Guardar",
@@ -1119,6 +1595,65 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
+
+                  // Acceso a Configuración de Teclas Simuladas
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      Future.delayed(const Duration(milliseconds: 200), () {
+                        if (mounted) _openKeyMappingSheet();
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF334155)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Iconify(Ri.keyboard_box_line,
+                                color: Color(0xFF38BDF8), size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "Configurar Teclas Simuladas",
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  "Vol: ${_formatKeyShort(_keyVolUp)}/${_formatKeyShort(_keyVolDown)} • Mús: ${_formatKeyShort(_keyMusicNext)}/${_formatKeyShort(_keyMusicPrev)}",
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Iconify(Ri.arrow_right_s_line,
+                              color: Colors.white54, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
 
                   // Switches
                   SwitchListTile(
@@ -1137,6 +1672,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     onChanged: (val) {
                       setState(() => _hapticEnabled = val);
                       setSheetState(() {});
+                      _saveConfig();
                       if (val) _triggerHaptic("forward");
                     },
                   ),
@@ -1417,29 +1953,16 @@ class _PresenterScreenState extends State<PresenterScreen> {
         backgroundColor: const Color(0xFF0F172A),
         elevation: 0,
         titleSpacing: 16,
-        title: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.asset('assets/images/app_logo.png'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'BT Presenter',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ],
+        title: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset('assets/images/app_logo.png'),
+          ),
         ),
         actions: [
           // Estado de conexión Laptop
@@ -1471,11 +1994,11 @@ class _PresenterScreenState extends State<PresenterScreen> {
                         : const Color(0xFFF59E0B),
                     size: 14,
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 5),
                   Text(
                     _isWsConnected
-                        ? "Laptop Conectada"
-                        : (_isDiscovering ? "Buscando..." : "Buscar Laptop"),
+                        ? "Conectada"
+                        : (_isDiscovering ? "Buscando..." : "Buscar PC"),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -1503,14 +2026,14 @@ class _PresenterScreenState extends State<PresenterScreen> {
       ),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
+          padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 10.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. Visor de Acción (Hero Feedback)
+              // 1. Visor de Acción (Hero Feedback Compacto)
               AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                 decoration: BoxDecoration(
                   color: _flashColor == Colors.transparent
                       ? const Color(0xFF1E293B)
@@ -1523,117 +2046,194 @@ class _PresenterScreenState extends State<PresenterScreen> {
                     width: 1.5,
                   ),
                 ),
-                child: Column(
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Iconify(_lastActionIcon, color: _lastActionColor, size: 22),
-                        const SizedBox(width: 8),
-                        Text(
-                          _lastActionTitle,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _lastActionSub,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFFCBD5E1),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _lastActionColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      textAlign: TextAlign.center,
+                      child: Iconify(_lastActionIcon, color: _lastActionColor, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _lastActionTitle,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _lastActionSub,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF94A3B8),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
 
-              // Botón Prominente para Buscar Laptop si está desconectada
-              if (!_isWsConnected) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E293B),
-                      foregroundColor: const Color(0xFF38BDF8),
-                      side: const BorderSide(
-                          color: Color(0xFF0284C7), width: 1.5),
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 14, horizontal: 16),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)),
-                      elevation: 3,
-                    ),
-                    icon: _isDiscovering
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Color(0xFF38BDF8),
-                            ),
-                          )
-                        : const Iconify(Ri.wifi_line,
-                            color: Color(0xFF38BDF8), size: 20),
-                    label: Text(
-                      _isDiscovering
-                          ? "Buscando laptop en la red..."
-                          : "Buscar Laptop en la Red",
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+              // Barra interactiva de Mapeo Rápido de Teclas
+              GestureDetector(
+                onTap: _openKeyMappingSheet,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Iconify(Ri.keyboard_box_line,
+                          color: Color(0xFF38BDF8), size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Vol: ${_formatKeyShort(_keyVolUp)}/${_formatKeyShort(_keyVolDown)} • Mús: ${_formatKeyShort(_keyMusicNext)}/${_formatKeyShort(_keyMusicPrev)} • Telón: ${_formatKeyShort(_keyPlayPause)}",
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFCBD5E1),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    onPressed: _isDiscovering
-                        ? null
-                        : () => _startDiscovery(manual: true),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          "Teclas",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF38BDF8),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
+              ),
+
+              // Banner compacto si la laptop está desconectada
+              if (!_isWsConnected) ...[
+                const SizedBox(height: 10),
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: _isDiscovering ? null : () => _startDiscovery(manual: true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _isDiscovering
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFFF59E0B),
+                                ),
+                              )
+                            : const Iconify(Ri.wifi_line,
+                                color: Color(0xFFF59E0B), size: 16),
+                        const SizedBox(width: 8),
+                        Text(
+                          _isDiscovering
+                              ? "Buscando laptop en la red..."
+                              : "Laptop desconectada • Toca para buscar",
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFF59E0B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ],
 
-              // 2. Gran Botón SIGUIENTE (Ocupa la mayor parte del clicker)
+              const SizedBox(height: 12),
+
+              // 2. Gran Botón SIGUIENTE (Proporción armónica flex: 3)
               Expanded(
-                flex: 5,
+                flex: 3,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0284C7), // Sky 600
+                    backgroundColor: const Color(0xFF0284C7),
                     foregroundColor: Colors.white,
                     elevation: 4,
-                    shadowColor: const Color(0xFF0284C7).withValues(alpha: 0.5),
+                    shadowColor: const Color(0xFF0284C7).withValues(alpha: 0.4),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(22),
                     ),
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                   ),
                   onPressed: () {
                     _triggerAction(
                       "forward",
                       "Siguiente Diapositiva",
-                      "Pulsado en la pantalla",
+                      "Simula: [${_formatKey(_keyMusicNext)}]",
                       const Color(0xFF38BDF8),
                       Ri.skip_forward_fill,
+                      simulatedKey: _keyMusicNext,
                     );
                   },
-                  child: const Column(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Iconify(Ri.skip_forward_fill,
-                          size: 44, color: Colors.white),
-                      SizedBox(height: 10),
-                      Text(
+                      const Iconify(Ri.skip_forward_fill,
+                          size: 40, color: Colors.white),
+                      const SizedBox(height: 8),
+                      const Text(
                         "SIGUIENTE",
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          "Tecla: ${_formatKeyShort(_keyMusicNext)}",
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
@@ -1643,46 +2243,65 @@ class _PresenterScreenState extends State<PresenterScreen> {
 
               const SizedBox(height: 12),
 
-              // 3. Fila de Botones Secundarios: ANTERIOR y TELÓN NEGRO
+              // 3. Fila de Botones Secundarios: ANTERIOR y TELÓN (Simétricos 1:1, flex: 2)
               Expanded(
                 flex: 2,
                 child: Row(
                   children: [
                     // Botón Anterior
                     Expanded(
-                      flex: 3,
-                      child: OutlinedButton.icon(
+                      child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           backgroundColor: const Color(0xFF1E293B),
                           foregroundColor: Colors.white,
                           side: const BorderSide(
                               color: Color(0xFF334155), width: 1.5),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                        ),
-                        icon: const Iconify(Ri.skip_back_fill,
-                            size: 18, color: Colors.white),
-                        label: const Text(
-                          "Anterior",
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 8),
                         ),
                         onPressed: () {
                           _triggerAction(
                             "back",
                             "Diapositiva Anterior",
-                            "Pulsado en la pantalla",
+                            "Simula: [${_formatKey(_keyMusicPrev)}]",
                             const Color(0xFFF43F5E),
                             Ri.skip_back_fill,
+                            simulatedKey: _keyMusicPrev,
                           );
                         },
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Iconify(Ri.skip_back_fill,
+                                size: 26, color: Colors.white),
+                            const SizedBox(height: 6),
+                            const Text(
+                              "ANTERIOR",
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              "Tecla: ${_formatKeyShort(_keyMusicPrev)}",
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF94A3B8),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    // Botón Telón Negro (Canva / PowerPoint)
+                    const SizedBox(width: 12),
+                    // Botón Telón
                     Expanded(
-                      flex: 2,
                       child: OutlinedButton(
                         style: OutlinedButton.styleFrom(
                           backgroundColor:
@@ -1691,28 +2310,43 @@ class _PresenterScreenState extends State<PresenterScreen> {
                           side: const BorderSide(
                               color: Color(0xFFA855F7), width: 1.5),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(20),
                           ),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 8),
                         ),
                         onPressed: () {
                           _triggerAction(
                             "play_pause",
-                            "Telón Negro",
-                            "Pantalla en pausa / oculta",
+                            "Telón / Pausa",
+                            "Simula: [${_formatKey(_keyPlayPause)}]",
                             const Color(0xFFA855F7),
                             Ri.pause_circle_fill,
+                            simulatedKey: _keyPlayPause,
                           );
                         },
-                        child: const Column(
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Iconify(Ri.pause_circle_fill,
-                                size: 22, color: Color(0xFFE9D5FF)),
-                            SizedBox(height: 2),
-                            Text(
-                              "Telón",
+                            const Iconify(Ri.pause_circle_fill,
+                                size: 26, color: Color(0xFFE9D5FF)),
+                            const SizedBox(height: 6),
+                            const Text(
+                              "TELÓN",
                               style: TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.bold),
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              "Tecla: ${_formatKeyShort(_keyPlayPause)}",
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFFD8B4FE),
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
@@ -1722,7 +2356,7 @@ class _PresenterScreenState extends State<PresenterScreen> {
                 ),
               ),
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
               // 4. Barra Inferior Dispositivo Bluetooth (Minimalista y Táctil)
               GestureDetector(

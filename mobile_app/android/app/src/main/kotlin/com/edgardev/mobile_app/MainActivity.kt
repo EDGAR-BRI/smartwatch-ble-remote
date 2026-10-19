@@ -83,6 +83,9 @@ class MainActivity : FlutterActivity() {
                 "getCacheDir" -> {
                     result.success(cacheDir.absolutePath)
                 }
+                "getFilesDir" -> {
+                    result.success(filesDir.absolutePath)
+                }
                 "canInstallApk" -> {
                     val canInstall = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         packageManager.canRequestPackageInstalls()
@@ -173,11 +176,11 @@ class MainActivity : FlutterActivity() {
                 ) {
                     override fun onAdjustVolume(direction: Int) {
                         if (direction > 0) {
-                            // Corona gira horario / Subir volumen ➔ Siguiente
-                            dispatchMediaAction("forward")
+                            // Corona gira horario / Subir volumen ➔ volume_up
+                            dispatchMediaAction("volume_up")
                         } else if (direction < 0) {
-                            // Corona gira antihorario / Bajar volumen ➔ Anterior
-                            dispatchMediaAction("back")
+                            // Corona gira antihorario / Bajar volumen ➔ volume_down
+                            dispatchMediaAction("volume_down")
                         }
                     }
                 }
@@ -212,22 +215,22 @@ class MainActivity : FlutterActivity() {
                 setCallback(object : MediaSession.Callback() {
                     override fun onSkipToNext() {
                         super.onSkipToNext()
-                        dispatchMediaAction("forward")
+                        dispatchMediaAction("music_next")
                     }
 
                     override fun onSkipToPrevious() {
                         super.onSkipToPrevious()
-                        dispatchMediaAction("back")
+                        dispatchMediaAction("music_prev")
                     }
 
                     override fun onFastForward() {
                         super.onFastForward()
-                        dispatchMediaAction("forward")
+                        dispatchMediaAction("music_next")
                     }
 
                     override fun onRewind() {
                         super.onRewind()
-                        dispatchMediaAction("back")
+                        dispatchMediaAction("music_prev")
                     }
 
                     override fun onPlay() {
@@ -251,21 +254,21 @@ class MainActivity : FlutterActivity() {
                         if (event != null && event.action == KeyEvent.ACTION_DOWN) {
                             when (event.keyCode) {
                                 KeyEvent.KEYCODE_VOLUME_UP -> {
-                                    dispatchMediaAction("forward")
+                                    dispatchMediaAction("volume_up")
                                     return true
                                 }
                                 KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                                    dispatchMediaAction("back")
+                                    dispatchMediaAction("volume_down")
                                     return true
                                 }
                                 KeyEvent.KEYCODE_MEDIA_NEXT,
                                 KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                                    dispatchMediaAction("forward")
+                                    dispatchMediaAction("music_next")
                                     return true
                                 }
                                 KeyEvent.KEYCODE_MEDIA_PREVIOUS,
                                 KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                                    dispatchMediaAction("back")
+                                    dispatchMediaAction("music_prev")
                                     return true
                                 }
                                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
@@ -536,11 +539,11 @@ class MainActivity : FlutterActivity() {
 
         val diff = currentVolume - baselineVolume
         if (diff > 0) {
-            // Corona giró horario / Subir volumen ➔ Siguiente
-            dispatchMediaAction("forward")
+            // Corona giró horario / Subir volumen ➔ volume_up
+            dispatchMediaAction("volume_up")
         } else if (diff < 0) {
-            // Corona giró antihorario / Bajar volumen ➔ Anterior
-            dispatchMediaAction("back")
+            // Corona giró antihorario / Bajar volumen ➔ volume_down
+            dispatchMediaAction("volume_down")
         }
 
         // Restablecer de inmediato al punto neutro sin UI ni sonido para evitar saturar el volumen
@@ -556,9 +559,9 @@ class MainActivity : FlutterActivity() {
         if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
             if (event.action == KeyEvent.ACTION_DOWN) {
                 if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
-                    dispatchMediaAction("forward")
+                    dispatchMediaAction("volume_up")
                 } else {
-                    dispatchMediaAction("back")
+                    dispatchMediaAction("volume_down")
                 }
             }
             return true // Consume tanto ACTION_DOWN como ACTION_UP para anular el cambio de volumen en el teléfono
@@ -568,12 +571,12 @@ class MainActivity : FlutterActivity() {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_MEDIA_NEXT,
                 KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                    dispatchMediaAction("forward")
+                    dispatchMediaAction("music_next")
                     return true
                 }
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS,
                 KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                    dispatchMediaAction("back")
+                    dispatchMediaAction("music_prev")
                     return true
                 }
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,

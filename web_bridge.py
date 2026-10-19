@@ -24,10 +24,20 @@ except ImportError:
 SUPPORTED_KEYS = {
     "RIGHT": ecodes.KEY_RIGHT,
     "LEFT": ecodes.KEY_LEFT,
+    "UP": ecodes.KEY_UP,
+    "DOWN": ecodes.KEY_DOWN,
     "PAGEDOWN": ecodes.KEY_PAGEDOWN,
     "PAGEUP": ecodes.KEY_PAGEUP,
     "SPACE": ecodes.KEY_SPACE,
+    "ENTER": ecodes.KEY_ENTER,
+    "ESC": ecodes.KEY_ESC,
+    "F5": ecodes.KEY_F5,
+    "B": ecodes.KEY_B,
+    "W": ecodes.KEY_W,
     "U": ecodes.KEY_U,
+    "VOLUMEUP": ecodes.KEY_VOLUMEUP,
+    "VOLUMEDOWN": ecodes.KEY_VOLUMEDOWN,
+    "MUTE": ecodes.KEY_MUTE,
 }
 
 
@@ -39,9 +49,7 @@ class VirtualClicker:
         capabilities = {ecodes.EV_KEY: list(SUPPORTED_KEYS.values())}
         self.uinput = evdev.UInput(events=capabilities, name="Smartwatch-Phone-Bridge")
         print(f"[✓] Teclado virtual uinput listo: 'Smartwatch-Phone-Bridge'")
-        print(f"    - Avanzar:    [{key_forward}]")
-        print(f"    - Retroceder: [{key_back}]")
-        print(f"    - Pausa (U):  [{key_pause}]")
+        print(f"    - Teclas soportadas: {', '.join(SUPPORTED_KEYS.keys())}")
 
     def emit(self, keycode):
         self.uinput.write(ecodes.EV_KEY, keycode, 1)
@@ -49,6 +57,13 @@ class VirtualClicker:
         time.sleep(0.04)
         self.uinput.write(ecodes.EV_KEY, keycode, 0)
         self.uinput.syn()
+
+    def emit_key(self, key_name):
+        code = SUPPORTED_KEYS.get(str(key_name).upper())
+        if code is not None:
+            self.emit(code)
+            return True
+        return False
 
     def forward(self):
         self.emit(self.code_forward)
@@ -170,19 +185,25 @@ class BridgeServer:
                 if msg.type == web.WSMsgType.TEXT:
                     data = json.loads(msg.data)
                     event_type = data.get("event")
+                    key = data.get("key")
 
-                    if event_type == "shutter":
+                    if key and str(key).upper() in SUPPORTED_KEYS:
+                        self.clicker.emit_key(key)
+                        now_str = datetime.datetime.now().strftime("%H:%M:%S")
+                        print(f"[{now_str}] ⌨️ Tecla simulada: [{str(key).upper()}] (Evento: {event_type})")
+                        await self._broadcast({"action": "key", "key": str(key).upper(), "event": event_type}, exclude_ws=ws)
+                    elif event_type == "shutter":
                         seq = data.get("sequence", -1)
                         await self._process_shutter(seq, ws)
-                    elif event_type == "forward":
+                    elif event_type in ("forward", "volume_up", "music_next"):
                         self.clicker.forward()
                         now_str = datetime.datetime.now().strftime("%H:%M:%S")
-                        print(f"[{now_str}] ⏩ Click manual: Avanzar")
+                        print(f"[{now_str}] ⏩ Avanzar (Evento: {event_type})")
                         await self._broadcast({"action": "forward"}, exclude_ws=ws)
-                    elif event_type == "back":
+                    elif event_type in ("back", "volume_down", "music_prev"):
                         self.clicker.back()
                         now_str = datetime.datetime.now().strftime("%H:%M:%S")
-                        print(f"[{now_str}] ⏪ Click manual: Retroceder")
+                        print(f"[{now_str}] ⏪ Retroceder (Evento: {event_type})")
                         await self._broadcast({"action": "back"}, exclude_ws=ws)
                     elif event_type in ("play_pause", "pause"):
                         self.clicker.pause()

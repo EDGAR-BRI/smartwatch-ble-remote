@@ -64,6 +64,33 @@ class MainActivity : FlutterActivity() {
     private var volumeObserver: ContentObserver? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    // Estado de reproducción para que el Smartwatch/Auriculares alternen Play/Pause y cada toque responda siempre
+    private var isCurrentlyPlaying = true
+
+    private fun updatePlaybackState(playing: Boolean) {
+        isCurrentlyPlaying = playing
+        val state = if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED
+        val stateBuilder = PlaybackState.Builder()
+            .setActions(
+                PlaybackState.ACTION_PLAY or
+                PlaybackState.ACTION_PAUSE or
+                PlaybackState.ACTION_PLAY_PAUSE or
+                PlaybackState.ACTION_SKIP_TO_NEXT or
+                PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+                PlaybackState.ACTION_FAST_FORWARD or
+                PlaybackState.ACTION_REWIND or
+                PlaybackState.ACTION_STOP
+            )
+            .setState(state, 0L, 1.0f)
+        mediaSession?.setPlaybackState(stateBuilder.build())
+    }
+
+    private fun handlePlayPauseToggle(targetState: Boolean? = null) {
+        val nextState = targetState ?: !isCurrentlyPlaying
+        updatePlaybackState(nextState)
+        dispatchMediaAction("play_pause")
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
@@ -186,21 +213,8 @@ class MainActivity : FlutterActivity() {
                 }
                 setPlaybackToRemote(volumeProvider)
 
-                // 2. Estado de reproducción activo con todas las acciones posibles
-                val stateBuilder = PlaybackState.Builder()
-                    .setActions(
-                        PlaybackState.ACTION_PLAY or
-                        PlaybackState.ACTION_PAUSE or
-                        PlaybackState.ACTION_PLAY_PAUSE or
-                        PlaybackState.ACTION_SKIP_TO_NEXT or
-                        PlaybackState.ACTION_SKIP_TO_PREVIOUS or
-                        PlaybackState.ACTION_FAST_FORWARD or
-                        PlaybackState.ACTION_REWIND or
-                        PlaybackState.ACTION_STOP
-                    )
-                    .setState(PlaybackState.STATE_PLAYING, 0L, 1.0f)
-
-                setPlaybackState(stateBuilder.build())
+                // 2. Estado de reproducción inicial (PLAYING)
+                updatePlaybackState(true)
 
                 // 3. Metadatos multimedia
                 val metadataBuilder = MediaMetadata.Builder()
@@ -235,12 +249,12 @@ class MainActivity : FlutterActivity() {
 
                     override fun onPlay() {
                         super.onPlay()
-                        dispatchMediaAction("play_pause")
+                        handlePlayPauseToggle(targetState = true)
                     }
 
                     override fun onPause() {
                         super.onPause()
-                        dispatchMediaAction("play_pause")
+                        handlePlayPauseToggle(targetState = false)
                     }
 
                     override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
@@ -251,33 +265,38 @@ class MainActivity : FlutterActivity() {
                             mediaButtonIntent.getParcelableExtra(Intent.EXTRA_KEY_EVENT)
                         }
 
-                        if (event != null && event.action == KeyEvent.ACTION_DOWN) {
-                            when (event.keyCode) {
-                                KeyEvent.KEYCODE_VOLUME_UP -> {
-                                    dispatchMediaAction("volume_up")
-                                    return true
-                                }
-                                KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                                    dispatchMediaAction("volume_down")
-                                    return true
-                                }
+                        if (event != null) {
+                            val isMediaKey = when (event.keyCode) {
+                                KeyEvent.KEYCODE_VOLUME_UP,
+                                KeyEvent.KEYCODE_VOLUME_DOWN,
                                 KeyEvent.KEYCODE_MEDIA_NEXT,
-                                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-                                    dispatchMediaAction("music_next")
-                                    return true
-                                }
+                                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
                                 KeyEvent.KEYCODE_MEDIA_PREVIOUS,
-                                KeyEvent.KEYCODE_MEDIA_REWIND -> {
-                                    dispatchMediaAction("music_prev")
-                                    return true
-                                }
+                                KeyEvent.KEYCODE_MEDIA_REWIND,
                                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
                                 KeyEvent.KEYCODE_HEADSETHOOK,
                                 KeyEvent.KEYCODE_MEDIA_PLAY,
-                                KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                                    dispatchMediaAction("play_pause")
-                                    return true
+                                KeyEvent.KEYCODE_MEDIA_PAUSE -> true
+                                else -> false
+                            }
+
+                            if (isMediaKey) {
+                                if (event.action == KeyEvent.ACTION_DOWN) {
+                                    when (event.keyCode) {
+                                        KeyEvent.KEYCODE_VOLUME_UP -> dispatchMediaAction("volume_up")
+                                        KeyEvent.KEYCODE_VOLUME_DOWN -> dispatchMediaAction("volume_down")
+                                        KeyEvent.KEYCODE_MEDIA_NEXT,
+                                        KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> dispatchMediaAction("music_next")
+                                        KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                                        KeyEvent.KEYCODE_MEDIA_REWIND -> dispatchMediaAction("music_prev")
+                                        KeyEvent.KEYCODE_MEDIA_PLAY -> handlePlayPauseToggle(targetState = true)
+                                        KeyEvent.KEYCODE_MEDIA_PAUSE -> handlePlayPauseToggle(targetState = false)
+                                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                                        KeyEvent.KEYCODE_HEADSETHOOK -> handlePlayPauseToggle()
+                                    }
                                 }
+                                // Consumir tanto ACTION_DOWN como ACTION_UP para evitar dobles disparos por super
+                                return true
                             }
                         }
                         return super.onMediaButtonEvent(mediaButtonIntent)
